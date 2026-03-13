@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shop | Davidson's Family Butcher</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="promo-bar">
+        <span>Order online for collection or local delivery</span>
+        <span>Phone 01339 741206</span>
+        <span>Mon-Sat 8am-4pm</span>
+      </div>
+      <header class="topbar">
+        <div class="brand-lockup">
+          <p class="eyebrow">Braemar, Scotland</p>
+          <h1>Davidson's Family Butcher</h1>
+        </div>
+        <nav class="topnav" aria-label="Primary">
+          <a href="index.html">Home</a>
+          <a class="active" href="shop.html">Shop</a>
+          <a href="visit.html">Visit</a>
+          <a href="staff-login.html">Staff</a>
+        </nav>
+      </header>
+      <div class="utility-row">
+        <span>Local delivery available</span>
+        <span>Collection slots available</span>
+        <span>Email orders@braemarbutcher.co.uk</span>
+      </div>
+
+      <main>
+        <section class="hero inner-hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Front end web shop</p>
+            <h2>Counter favourites, family packs and Highland delivery orders.</h2>
+            <p class="hero-text">
+              This page is the customer-facing ordering surface. It should stay clear, practical and easy
+              to use on mobile for locals placing quick repeat orders.
+            </p>
+            <div class="category-row">
+              <span>Popular this week</span>
+              <span>Pies</span>
+              <span>Sausages</span>
+              <span>Venison</span>
+              <span>Breakfast packs</span>
+              <span>Family boxes</span>
+            </div>
+          </div>
+          <aside class="hero-panel compact-panel">
+            <div class="stat-card">
+              <span>Collection slot</span>
+              <strong>Tomorrow, 10am-12pm</strong>
+            </div>
+            <div class="stat-card">
+              <span>Local delivery</span>
+              <strong>Available Mon-Sat</strong>
+            </div>
+          </aside>
+        </section>
+
+        <section class="service-strip shop-strip">
+          <article>
+            <strong>Choose products</strong>
+            <span>Simple basket-first layout for repeat ordering.</span>
+          </article>
+          <article>
+            <strong>Prepared fresh</strong>
+            <span>Packed for same-day counter handling and next-day plans.</span>
+          </article>
+          <article>
+            <strong>Local support</strong>
+            <span>Customers can still call if they prefer the old way.</span>
+          </article>
+        </section>
+
+        <section class="section retail-section" id="shop">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Shop</p>
+              <h3>Prepared for Braemar delivery or collection</h3>
+            </div>
+            <div class="basket-summary" id="basket-summary">
+              <span>Basket</span>
+              <strong>0 items</strong>
+              <span>£0.00</span>
+            </div>
+          </div>
+          <div class="shop-layout">
+            <div class="product-grid" id="product-grid"></div>
+            <aside class="order-panel">
+              <div class="panel-head">
+                <p class="eyebrow">Live basket</p>
+                <h4>Prepared for Braemar delivery or collection</h4>
+              </div>
+              <div id="basket-items" class="basket-items"></div>
+              <div class="order-totals">
+                <div>
+                  <span>Subtotal</span>
+                  <strong id="subtotal-value">£0.00</strong>
+                </div>
+                <div>
+                  <span>Delivery</span>
+                  <strong>£6.50</strong>
+                </div>
+                <div class="grand-total">
+                  <span>Total</span>
+                  <strong id="total-value">£6.50</strong>
+                </div>
+              </div>
+              <button class="button primary full-width">Proceed to checkout</button>
+            </aside>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>Winter hours: Mon-Sat 8am-4pm</span>
+        <span>Phone orders: 01339 741206</span>
+        <span>Email: orders@braemarbutcher.co.uk</span>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

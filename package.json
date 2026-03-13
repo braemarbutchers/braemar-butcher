@@ -1,0 +1,10 @@
+{
+  "name": "braemar-butcher",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Static prototype for Davidson's Family Butcher with Supabase-ready schema.",
+  "scripts": {
+    "start": "npx serve .",
+    "vercel-build": "echo \"Static site ready for Vercel\""
+  }
+}

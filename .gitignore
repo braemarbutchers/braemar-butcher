@@ -1,0 +1,9 @@
+.DS_Store
+*.swp
+.env
+.env.local
+.env.*.local
+
+.vercel
+
+supabase/.temp

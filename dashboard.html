@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Davidson's Family Butcher</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Operations dashboard</p>
+          <h1>Davidson's Family Butcher</h1>
+        </div>
+        <nav class="topnav" aria-label="Primary">
+          <a href="index.html">View site</a>
+          <a href="dashboard.html">Dashboard</a>
+          <a href="dashboard.html#traceability" data-open-tab="traceability">Tracing</a>
+          <a href="dashboard.html#labels" data-open-tab="labels">Labels</a>
+        </nav>
+      </header>
+
+      <main>
+        <section class="hero inner-hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Back office</p>
+            <h2>Production control, stock booking, traceability and print-ready label output.</h2>
+            <p class="hero-text">
+              This is now a dedicated staff page rather than part of the public web shop. In a real build,
+              this page would sit behind authenticated roles for counter staff, production and admin.
+            </p>
+          </div>
+          <aside class="hero-panel compact-panel">
+            <div class="stat-card">
+              <span>Production runs</span>
+              <strong>8 live</strong>
+            </div>
+            <div class="stat-card">
+              <span>Low stock lines</span>
+              <strong>2 flagged</strong>
+            </div>
+          </aside>
+        </section>
+
+        <section class="section operations" id="operations">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Back office</p>
+              <h3>Production control room</h3>
+            </div>
+            <div class="tablist" role="tablist" aria-label="Back office modules">
+              <button class="tab active" data-tab="stock" role="tab" aria-selected="true">Stock</button>
+              <button class="tab" data-tab="traceability" role="tab" aria-selected="false">Tracing</button>
+              <button class="tab" data-tab="labels" role="tab" aria-selected="false">Labels</button>
+            </div>
+          </div>
+
+          <div class="tab-panel active" id="stock-panel">
+            <div class="panel-grid">
+              <section class="panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Stock management</p>
+                  <h4>Current inventory by product line</h4>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>SKU</th>
+                      <th>Product</th>
+                      <th>On hand</th>
+                      <th>Threshold</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="inventory-table"></tbody>
+                </table>
+              </section>
+              <section class="panel action-panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Quick adjustment</p>
+                  <h4>Book stock usage to production</h4>
+                </div>
+                <form id="stock-form">
+                  <label>
+                    Product
+                    <select id="stock-product"></select>
+                  </label>
+                  <label>
+                    Quantity used
+                    <input id="stock-quantity" type="number" min="1" value="2" />
+                  </label>
+                  <label>
+                    Production note
+                    <input id="stock-note" type="text" value="Reserved for morning pie run" />
+                  </label>
+                  <button type="submit" class="button primary full-width">Record movement</button>
+                </form>
+                <div class="activity-log" id="stock-activity"></div>
+              </section>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="traceability-panel">
+            <div class="panel-grid trace-grid">
+              <section class="panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Meat tracing</p>
+                  <h4>Batch register</h4>
+                </div>
+                <div class="batch-list" id="batch-list"></div>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Chain of custody</p>
+                  <h4 id="trace-title">Select a batch</h4>
+                </div>
+                <div class="trace-meta" id="trace-meta"></div>
+                <ol class="timeline" id="trace-timeline"></ol>
+              </section>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="labels-panel">
+            <div class="panel-grid">
+              <section class="panel action-panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Label making</p>
+                  <h4>Generate a retail-ready label</h4>
+                </div>
+                <form id="label-form">
+                  <label>
+                    Product name
+                    <input id="label-product" type="text" value="Family Steak Pie" />
+                  </label>
+                  <label>
+                    Batch code
+                    <input id="label-batch" type="text" value="DB-260313-PIE" />
+                  </label>
+                  <label>
+                    Packed on
+                    <input id="label-packed" type="date" value="2026-03-13" />
+                  </label>
+                  <label>
+                    Use by
+                    <input id="label-useby" type="date" value="2026-03-20" />
+                  </label>
+                  <label>
+                    Weight
+                    <input id="label-weight" type="text" value="1.20 kg" />
+                  </label>
+                  <label>
+                    Price
+                    <input id="label-price" type="text" value="£12.50" />
+                  </label>
+                  <button type="submit" class="button primary full-width">Update preview</button>
+                  <button id="print-label" type="button" class="button secondary full-width">Print label</button>
+                </form>
+              </section>
+              <section class="panel label-preview-wrap">
+                <div class="panel-head">
+                  <p class="eyebrow">Print preview</p>
+                  <h4>Counter label output</h4>
+                </div>
+                <article class="label-preview" id="label-preview">
+                  <header>
+                    <span>DAVIDSON'S FAMILY BUTCHER</span>
+                    <strong>Product Label</strong>
+                  </header>
+                  <h5 id="preview-product">Family Steak Pie</h5>
+                  <dl>
+                    <div>
+                      <dt>Batch</dt>
+                      <dd id="preview-batch">DB-260313-PIE</dd>
+                    </div>
+                    <div>
+                      <dt>Packed</dt>
+                      <dd id="preview-packed">2026-03-13</dd>
+                    </div>
+                    <div>
+                      <dt>Use by</dt>
+                      <dd id="preview-useby">2026-03-20</dd>
+                    </div>
+                    <div>
+                      <dt>Weight</dt>
+                      <dd id="preview-weight">1.20 kg</dd>
+                    </div>
+                  </dl>
+                  <div class="label-price-row">
+                    <span id="preview-price">£12.50</span>
+                    <span class="barcode">|||| ||| |||| | ||</span>
+                  </div>
+                </article>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
