@@ -4,7 +4,9 @@ VALUES
   ('22222222-2222-2222-2222-222222222221', 'counter@braemarbutcher.co.uk', 'replace-with-real-hash', 'staff', 'active', NOW()),
   ('22222222-2222-2222-2222-222222222222', 'production@braemarbutcher.co.uk', 'replace-with-real-hash', 'staff', 'active', NOW()),
   ('33333333-3333-3333-3333-333333333331', 'alice.macleod@example.com', 'replace-with-real-hash', 'client', 'active', NOW()),
-  ('33333333-3333-3333-3333-333333333332', 'thefifearms@example.com', 'replace-with-real-hash', 'client', 'active', NOW());
+  ('33333333-3333-3333-3333-333333333332', 'thefifearms@example.com', 'replace-with-real-hash', 'client', 'active', NOW()),
+  ('33333333-3333-3333-3333-333333333333', 'morrone.lodge@example.com', 'replace-with-real-hash', 'client', 'active', NOW()),
+  ('33333333-3333-3333-3333-333333333334', 'fraser.family@example.com', 'replace-with-real-hash', 'client', 'active', NOW());
 
 INSERT INTO staff_profiles (
   user_id,
@@ -34,7 +36,9 @@ INSERT INTO client_profiles (
 )
 VALUES
   ('33333333-3333-3333-3333-333333333331', 'CUST-0001', NULL, 'Alice MacLeod', '07700 900123', 'collection', 'Regular Saturday collection customer.'),
-  ('33333333-3333-3333-3333-333333333332', 'TRADE-0001', 'The Fife Arms', 'Kitchen Office', '01339 720200', 'delivery', 'Trade account requiring weekly invoice.');
+  ('33333333-3333-3333-3333-333333333332', 'TRADE-0001', 'The Fife Arms', 'Kitchen Office', '01339 720200', 'delivery', 'Trade account requiring weekly invoice.'),
+  ('33333333-3333-3333-3333-333333333333', 'CUST-0002', 'Morrone Lodge', 'House Manager', '01339 741455', 'delivery', 'Holiday let requiring chilled doorstep delivery.'),
+  ('33333333-3333-3333-3333-333333333334', 'CUST-0003', 'Invercauld Cottage', 'Mrs Fraser', '07700 900455', 'delivery', 'Leave in cool box if customer is out.');
 
 INSERT INTO client_addresses (
   id,
@@ -51,7 +55,9 @@ INSERT INTO client_addresses (
 )
 VALUES
   ('44444444-4444-4444-4444-444444444441', '33333333-3333-3333-3333-333333333331', 'Home', 'Alice MacLeod', '12 Chapel Brae', 'Braemar', 'Aberdeenshire', 'AB35 5YT', 'Collect from front counter.', TRUE, TRUE),
-  ('44444444-4444-4444-4444-444444444442', '33333333-3333-3333-3333-333333333332', 'Hotel Kitchen', 'The Fife Arms Kitchen', 'Mar Road', 'Braemar', 'Aberdeenshire', 'AB35 5YN', 'Deliver to kitchen loading bay before 11am.', TRUE, TRUE);
+  ('44444444-4444-4444-4444-444444444442', '33333333-3333-3333-3333-333333333332', 'Hotel Kitchen', 'The Fife Arms Kitchen', 'Mar Road', 'Braemar', 'Aberdeenshire', 'AB35 5YN', 'Deliver to kitchen loading bay before 11am.', TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444443', '33333333-3333-3333-3333-333333333333', 'Main House', 'Morrone Lodge', '27 Glenshee Road', 'Braemar', 'Aberdeenshire', 'AB35 5YQ', 'Use side entrance and ring bell.', TRUE, TRUE),
+  ('44444444-4444-4444-4444-444444444444', '33333333-3333-3333-3333-333333333334', 'Cottage', 'Mrs Fraser', 'Invercauld Road', 'Braemar', 'Aberdeenshire', 'AB35 5YP', 'Leave in cool box by porch if no answer.', TRUE, TRUE);
 
 INSERT INTO products (id, sku, name, description, unit, price)
 VALUES
@@ -108,6 +114,38 @@ VALUES
     88.00,
     6.50,
     94.50
+  ),
+  (
+    '66666666-6666-6666-6666-666666666663',
+    'ORD-20260314-003',
+    '33333333-3333-3333-3333-333333333333',
+    '22222222-2222-2222-2222-222222222221',
+    'delivery',
+    'ready',
+    '2026-03-14 09:30:00+00',
+    '44444444-4444-4444-4444-444444444443',
+    '44444444-4444-4444-4444-444444444443',
+    'Family stay arrival hamper.',
+    'Pack with frozen gel inserts.',
+    45.90,
+    6.50,
+    52.40
+  ),
+  (
+    '66666666-6666-6666-6666-666666666664',
+    'ORD-20260314-004',
+    '33333333-3333-3333-3333-333333333334',
+    '22222222-2222-2222-2222-222222222221',
+    'delivery',
+    'preparing',
+    '2026-03-14 10:15:00+00',
+    '44444444-4444-4444-4444-444444444444',
+    '44444444-4444-4444-4444-444444444444',
+    'Please text on delivery.',
+    'Customer requested porch drop if out.',
+    31.50,
+    6.50,
+    38.00
   );
 
 INSERT INTO order_items (id, order_id, product_id, quantity, unit_price, line_total, note)
@@ -116,7 +154,11 @@ VALUES
   ('77777777-7777-7777-7777-777777777772', '66666666-6666-6666-6666-666666666661', '55555555-5555-5555-5555-555555555552', 2, 5.95, 11.90, NULL),
   ('77777777-7777-7777-7777-777777777773', '66666666-6666-6666-6666-666666666661', '55555555-5555-5555-5555-555555555554', 1, 4.05, 4.05, 'Discounted add-on item'),
   ('77777777-7777-7777-7777-777777777774', '66666666-6666-6666-6666-666666666662', '55555555-5555-5555-5555-555555555552', 8, 5.95, 47.60, NULL),
-  ('77777777-7777-7777-7777-777777777775', '66666666-6666-6666-6666-666666666662', '55555555-5555-5555-5555-555555555554', 2, 20.20, 40.40, 'Trade pricing applied');
+  ('77777777-7777-7777-7777-777777777775', '66666666-6666-6666-6666-666666666662', '55555555-5555-5555-5555-555555555554', 2, 20.20, 40.40, 'Trade pricing applied'),
+  ('77777777-7777-7777-7777-777777777776', '66666666-6666-6666-6666-666666666663', '55555555-5555-5555-5555-555555555551', 1, 12.50, 12.50, NULL),
+  ('77777777-7777-7777-7777-777777777777', '66666666-6666-6666-6666-666666666663', '55555555-5555-5555-5555-555555555553', 1, 33.40, 33.40, 'Hamper centrepiece'),
+  ('77777777-7777-7777-7777-777777777778', '66666666-6666-6666-6666-666666666664', '55555555-5555-5555-5555-555555555552', 2, 5.95, 11.90, NULL),
+  ('77777777-7777-7777-7777-777777777779', '66666666-6666-6666-6666-666666666664', '55555555-5555-5555-5555-555555555554', 1, 19.60, 19.60, 'Adjusted local delivery price');
 
 INSERT INTO saved_lists (id, client_user_id, name, description, last_used_at)
 VALUES

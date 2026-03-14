@@ -62,6 +62,7 @@ This repository is now structured for:
 5. Deploy
 
 Vercel will serve the static site and map `/shop`, `/visit`, `/staff`, and `/dashboard` to the existing HTML files.
+The repo also includes a lightweight serverless endpoint at [api/config.js](/Users/marksmith/braemar-butcher/api/config.js) so the browser can load the public Supabase URL and anon key from Vercel environment variables.
 
 ### Supabase
 
@@ -71,6 +72,7 @@ Vercel will serve the static site and map `/shop`, `/visit`, `/staff`, and `/das
 4. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
 
 If you use the Supabase CLI locally, the project is already laid out for `supabase start`, `supabase db reset`, and future migrations.
+The storefront fetches live product data through Supabase using the public keys exposed by [api/config.js](/Users/marksmith/braemar-butcher/api/config.js), while the rest of the dashboard remains prototype-only until more backend tables are added.
 
 ## Database foundation
 
