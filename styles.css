@@ -454,6 +454,14 @@ td,
   background: linear-gradient(180deg, #fffdf9, #f7f0e7);
 }
 
+.owner-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.95fr);
+  gap: 20px;
+  align-items: start;
+  background: linear-gradient(180deg, #fffdf9, #f4ece3);
+}
+
 .story-copy h3 {
   margin: 0 0 12px;
   font-family: "Fraunces", serif;
