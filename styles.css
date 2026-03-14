@@ -50,10 +50,10 @@ body {
 }
 
 .topbar {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  justify-items: center;
   align-items: center;
-  gap: 24px;
+  gap: 18px;
   padding: 22px 28px;
   margin-top: 18px;
   border: 1px solid var(--line);
@@ -65,8 +65,7 @@ body {
 .brand-lockup {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-width: max-content;
+  justify-content: center;
   text-decoration: none;
 }
 
@@ -97,6 +96,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
+  justify-content: center;
 }
 
 .topnav a,
@@ -1473,8 +1473,7 @@ select {
   .product-admin-head,
   .product-admin-meta,
   .brand-strip,
-  .site-footer,
-  .brand-lockup {
+  .site-footer {
     display: grid;
   }
 
