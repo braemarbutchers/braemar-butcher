@@ -346,6 +346,15 @@ td,
   margin-bottom: 22px;
 }
 
+.section-note {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 0.96rem;
+  line-height: 1.5;
+  text-align: right;
+}
+
 .section-heading.compact {
   margin-bottom: 18px;
 }
@@ -373,7 +382,7 @@ td,
 .service-strip strong {
   display: block;
   margin-bottom: 8px;
-  font-size: 1rem;
+  font-size: 0.98rem;
 }
 
 .service-strip span {
@@ -418,12 +427,49 @@ td,
   font-size: 1.15rem;
 }
 
-.soft-section {
-  background: linear-gradient(180deg, #fffdf9, #f8f2ea);
-}
-
 .retail-section {
   background: linear-gradient(180deg, #ffffff, #fffdf9);
+}
+
+.home-story {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.95fr);
+  gap: 20px;
+  align-items: start;
+  background: linear-gradient(180deg, #fffdf9, #f7f0e7);
+}
+
+.story-copy h3 {
+  margin: 0 0 12px;
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.9rem, 3vw, 2.7rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}
+
+.story-copy p:last-child {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.story-points {
+  display: grid;
+  gap: 12px;
+}
+
+.story-points div {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.story-points strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.1rem;
 }
 
 .basket-summary {
@@ -432,6 +478,11 @@ td,
   border-radius: 14px;
   background: rgba(123, 35, 48, 0.05);
   border: 1px solid var(--line);
+}
+
+.order-panel .basket-summary {
+  min-width: 0;
+  margin-bottom: 8px;
 }
 
 .basket-summary strong {
@@ -597,7 +648,7 @@ td,
 
 .basket-items {
   min-height: 180px;
-  margin: 18px 0;
+  margin: 16px 0;
 }
 
 .basket-line {
