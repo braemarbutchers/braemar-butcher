@@ -1314,6 +1314,18 @@ select {
   text-transform: uppercase;
 }
 
+.label-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.label-brand img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
 .label-preview h5 {
   font-size: 2rem;
   margin: 20px 0;
@@ -1623,6 +1635,15 @@ select {
     font-size: 4.5pt;
     letter-spacing: 0.02em;
     line-height: 1;
+  }
+
+  body.printing-label-sheet #label-preview .label-brand {
+    gap: 1mm;
+  }
+
+  body.printing-label-sheet #label-preview .label-brand img {
+    width: 5mm;
+    height: 5mm;
   }
 
   body.printing-label-sheet #label-preview h5 {

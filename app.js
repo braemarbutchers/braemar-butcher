@@ -2722,6 +2722,11 @@ function printLabelPreview() {
     return;
   }
 
+  const labelPreviewClone = labelPreview.cloneNode(true);
+  labelPreviewClone.querySelectorAll("img").forEach((image) => {
+    image.src = new URL(image.getAttribute("src"), window.location.href).href;
+  });
+
   const printWindow = window.open("", "brother-label-print", "width=320,height=240");
   if (!printWindow) {
     window.print();
@@ -2778,6 +2783,18 @@ function printLabelPreview() {
         letter-spacing: 0.02em;
         line-height: 1;
         text-transform: uppercase;
+      }
+
+      .label-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 1mm;
+      }
+
+      .label-brand img {
+        width: 5mm;
+        height: 5mm;
+        object-fit: contain;
       }
 
       .label-preview h5 {
@@ -2872,7 +2889,7 @@ function printLabelPreview() {
       }
     </style>
   </head>
-  <body>${labelPreview.outerHTML}</body>
+  <body>${labelPreviewClone.outerHTML}</body>
 </html>`);
   printWindow.document.close();
   printWindow.focus();
