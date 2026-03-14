@@ -67,6 +67,7 @@ body {
   align-items: center;
   gap: 14px;
   min-width: max-content;
+  text-decoration: none;
 }
 
 .brand-copy {
@@ -75,7 +76,7 @@ body {
 }
 
 .site-logo {
-  width: 132px;
+  width: 220px;
   height: auto;
   display: block;
   flex: 0 0 auto;
@@ -1462,7 +1463,7 @@ select {
   }
 
   .site-logo {
-    width: 110px;
+    width: 180px;
   }
 
   .promo-bar {
