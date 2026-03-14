@@ -63,7 +63,22 @@ body {
 }
 
 .brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   min-width: max-content;
+}
+
+.brand-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.site-logo {
+  width: 132px;
+  height: auto;
+  display: block;
+  flex: 0 0 auto;
 }
 
 .topbar h1,
@@ -1433,8 +1448,13 @@ select {
   .product-admin-head,
   .product-admin-meta,
   .brand-strip,
-  .site-footer {
+  .site-footer,
+  .brand-lockup {
     display: grid;
+  }
+
+  .site-logo {
+    width: 110px;
   }
 
   .promo-bar {
