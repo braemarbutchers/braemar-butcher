@@ -2716,6 +2716,172 @@ function updateLabelPreview(formData) {
   }
 }
 
+function printLabelPreview() {
+  const labelPreview = document.getElementById("label-preview");
+  if (!labelPreview) {
+    return;
+  }
+
+  const printWindow = window.open("", "brother-label-print", "width=320,height=240");
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  printWindow.document.write(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Print Label</title>
+    <style>
+      @page {
+        size: 62mm 29mm;
+        margin: 0;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 62mm;
+        height: 29mm;
+        overflow: hidden;
+        background: #fff;
+        color: #000;
+        font-family: Manrope, sans-serif;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      body {
+        box-sizing: border-box;
+      }
+
+      .label-preview {
+        box-sizing: border-box;
+        width: 62mm;
+        min-height: 29mm;
+        height: 29mm;
+        padding: 1.5mm 2mm;
+        color: #000;
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 0.8mm;
+        overflow: hidden;
+      }
+
+      .label-preview header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 1.2mm;
+        font-size: 4.5pt;
+        letter-spacing: 0.02em;
+        line-height: 1;
+        text-transform: uppercase;
+      }
+
+      .label-preview h5 {
+        margin: 0;
+        font-size: 8.5pt;
+        line-height: 1;
+      }
+
+      .label-preview dl {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.6mm 1.6mm;
+        margin: 0;
+      }
+
+      .label-preview dl div {
+        width: auto;
+        padding: 0;
+      }
+
+      .label-preview dt,
+      .label-preview dd,
+      .barcode-value {
+        color: #000;
+      }
+
+      .label-preview dt {
+        font-size: 4pt;
+        line-height: 1;
+      }
+
+      .label-preview dd {
+        margin: 0.2mm 0 0;
+        font-size: 5pt;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .label-price-row {
+        margin-top: 0;
+        padding-top: 0.6mm;
+        display: grid;
+        gap: 0.8mm;
+        grid-template-columns: auto 1fr;
+        align-items: end;
+        border-top: 0.25mm solid #000;
+      }
+
+      #preview-price {
+        font-size: 8pt;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .barcode-svg {
+        overflow: hidden;
+      }
+
+      .barcode-bars {
+        display: flex;
+        align-items: stretch;
+        height: 5.5mm;
+        width: 100%;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .barcode-bar,
+      .barcode-space,
+      .barcode-gap {
+        display: block;
+        height: 100%;
+        flex: 0 0 auto;
+      }
+
+      .barcode-bar {
+        background: #000;
+        box-shadow: inset 0 0 0 1000px #000;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .barcode-value {
+        display: block;
+        margin-top: 0.4mm;
+        font-family: monospace;
+        font-size: 4pt;
+        letter-spacing: 0.02em;
+        line-height: 1;
+        text-transform: uppercase;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>${labelPreview.outerHTML}</body>
+</html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.addEventListener("afterprint", () => {
+    printWindow.close();
+  });
+  printWindow.print();
+}
+
 function renderFeaturedProducts() {
   if (!featuredGrid) {
     return;
@@ -3314,8 +3480,7 @@ if (labelForm) {
 const printButton = document.getElementById("print-label");
 if (printButton) {
   printButton.addEventListener("click", () => {
-    document.body.classList.add("printing-label-sheet");
-    window.print();
+    printLabelPreview();
   });
 }
 
