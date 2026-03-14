@@ -1712,6 +1712,7 @@ async function saveInboundLotToSupabase(entry) {
     await supabase.from("source_animals").insert({
       inbound_lot_id: lotRow.id,
       animal_identifier: entry.animalId,
+      slaughter_date: entry.slaughterDate || null,
     });
   }
 
@@ -2683,6 +2684,8 @@ function renderTraceDetails(batchId) {
     <div><strong>Supplier</strong><br />${sourceLot?.supplier || batch.origin}</div>
     <div><strong>Intake</strong><br />${batch.sourceIntakeCode || sourceLot?.intakeCode || "Not linked"}</div>
     <div><strong>Animal ID</strong><br />${batch.animalId || sourceLot?.animalId || "Not recorded"}</div>
+    <div><strong>Kill date</strong><br />${formatDateForDisplay(sourceLot?.slaughterDate)}</div>
+    <div><strong>Source qty used</strong><br />${batch.sourceQuantityUsed || "Not recorded"} kg</div>
     <div><strong>Yield</strong><br />${batch.yield}</div>
   `;
   traceTimeline.innerHTML = batch.timeline
@@ -3009,6 +3012,7 @@ if (intakeForm) {
       cutDescription: document.getElementById("intake-cut").value.trim(),
       supplierLotCode: document.getElementById("intake-supplier-lot").value.trim(),
       animalId: document.getElementById("intake-animal-id").value.trim(),
+      slaughterDate: document.getElementById("intake-kill-date").value,
       receivedAt: document.getElementById("intake-received").value,
       useBy: document.getElementById("intake-useby").value,
       weightKg: Number(document.getElementById("intake-weight").value),
