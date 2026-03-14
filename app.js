@@ -386,6 +386,7 @@ const finishedBatchForm = document.getElementById("finished-batch-form");
 const finishedBatchFeedback = document.getElementById("finished-batch-feedback");
 const finishedProductInput = document.getElementById("finished-product");
 const finishedSourceLotInput = document.getElementById("finished-source-lot");
+const finishedSourceQuantityInput = document.getElementById("finished-source-quantity");
 const labelSourceBatchInput = document.getElementById("label-source-batch");
 const labelBarcodeInput = document.getElementById("label-barcode");
 const shopHeading = document.querySelector("#shop .section-heading h3");
@@ -1401,7 +1402,7 @@ async function fetchLiveTraceability() {
   const [{ data: lots, error: lotsError }, { data: batchesData, error: batchesError }] = await Promise.all([
     supabase
       .from("inbound_lots")
-      .select("id, intake_code, source_type, species, cut_description, supplier_lot_code, received_at, use_by_date, received_weight_kg, status, notes, source_animals(animal_identifier), suppliers(name), stock_batches(batch_code)")
+      .select("id, intake_code, source_type, species, cut_description, supplier_lot_code, received_at, use_by_date, received_weight_kg, status, notes, source_animals(animal_identifier), suppliers(name), stock_batches(batch_code, batch_type, quantity, status)")
       .order("received_at", { ascending: false }),
     supabase
       .from("product_batches")
@@ -1433,7 +1434,12 @@ async function fetchLiveTraceability() {
   }
 
   if (Array.isArray(lots) && lots.length) {
-    inboundLots = lots.map((lot) => ({
+    inboundLots = lots.map((lot) => {
+      const rawBatch = Array.isArray(lot.stock_batches)
+        ? lot.stock_batches.find((batch) => batch.batch_type === "raw") || lot.stock_batches[0]
+        : lot.stock_batches;
+
+      return {
       id: lot.id,
       intakeCode: lot.intake_code,
       supplier: lot.suppliers?.name || "Unknown supplier",
@@ -1444,11 +1450,12 @@ async function fetchLiveTraceability() {
       animalId: lot.source_animals?.[0]?.animal_identifier || "",
       receivedAt: formatDateForInput(lot.received_at),
       useBy: formatDateForInput(lot.use_by_date),
-      weightKg: Number(lot.received_weight_kg || 0),
+      weightKg: Number(rawBatch?.quantity ?? lot.received_weight_kg ?? 0),
       note: lot.notes || "",
-      rawBatchCode: lot.stock_batches?.[0]?.batch_code || "",
+      rawBatchCode: rawBatch?.batch_code || "",
       status: titleCaseStatus(lot.status),
-    }));
+      };
+    });
   }
 
   if (Array.isArray(batchesData) && batchesData.length) {
@@ -1469,6 +1476,7 @@ async function fetchLiveTraceability() {
         packedOn: formatDateForInput(stockBatch.packed_on),
         useBy: formatDateForInput(stockBatch.use_by_date),
         quantity: Number(row.packed_quantity || stockBatch.quantity || 0),
+        sourceQuantityUsed: Number(snapshot.sourceQuantityUsed || 0),
         unit: row.packed_unit || "item",
         yield: snapshot.weight || `${row.packed_quantity || stockBatch.quantity || 0} ${row.packed_unit || "item"}`,
         weight: snapshot.weight || `${row.packed_quantity || stockBatch.quantity || 0} ${row.packed_unit || "item"}`,
@@ -1538,6 +1546,10 @@ async function saveInboundLotToSupabase(entry) {
     throw lotError;
   }
 
+  if (!lotRow?.id) {
+    throw new Error("The selected source intake lot could not be found in Supabase.");
+  }
+
   if (entry.animalId) {
     await supabase.from("source_animals").insert({
       inbound_lot_id: lotRow.id,
@@ -1566,13 +1578,37 @@ async function saveFinishedBatchToSupabase(entry) {
 
   const { data: lotRow, error: lotError } = await supabase
     .from("inbound_lots")
-    .select("id")
+    .select("id, status")
     .eq("intake_code", sourceLot.intakeCode)
     .maybeSingle();
 
   if (lotError) {
     throw lotError;
   }
+
+  const { data: rawBatchRow, error: rawBatchError } = await supabase
+    .from("stock_batches")
+    .select("id, quantity, status, batch_code")
+    .eq("source_inbound_lot_id", lotRow?.id || "")
+    .eq("batch_type", "raw")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (rawBatchError) {
+    throw rawBatchError;
+  }
+
+  if (!rawBatchRow?.id) {
+    throw new Error("The source intake lot does not have a raw stock batch to consume.");
+  }
+
+  if (Number(entry.sourceQuantityUsed || 0) > Number(rawBatchRow.quantity || 0)) {
+    throw new Error(`Only ${rawBatchRow.quantity} kg remains on the selected raw batch.`);
+  }
+
+  const remainingRawQuantity = Math.max(0, Number(rawBatchRow.quantity || 0) - Number(entry.sourceQuantityUsed || 0));
+  const nextRawBatchStatus = remainingRawQuantity <= 0 ? "consumed" : "available";
 
   const { data: stockBatchRow, error: stockBatchError } = await supabase
     .from("stock_batches")
@@ -1595,6 +1631,63 @@ async function saveFinishedBatchToSupabase(entry) {
     throw stockBatchError;
   }
 
+  const { data: transformationRow, error: transformationError } = await supabase
+    .from("stock_transformations")
+    .insert({
+      transformation_type: "pack",
+      performed_at: `${entry.packedOn}T00:00:00+00`,
+      notes: entry.note || `Produced ${entry.id} from ${rawBatchRow.batch_code}.`,
+    })
+    .select("id")
+    .single();
+
+  if (transformationError) {
+    throw transformationError;
+  }
+
+  const { error: transformationInputError } = await supabase.from("transformation_inputs").insert({
+    transformation_id: transformationRow.id,
+    stock_batch_id: rawBatchRow.id,
+    quantity: entry.sourceQuantityUsed,
+  });
+
+  if (transformationInputError) {
+    throw transformationInputError;
+  }
+
+  const { error: transformationOutputError } = await supabase.from("transformation_outputs").insert({
+    transformation_id: transformationRow.id,
+    stock_batch_id: stockBatchRow.id,
+    quantity: entry.quantity,
+  });
+
+  if (transformationOutputError) {
+    throw transformationOutputError;
+  }
+
+  const { error: rawBatchUpdateError } = await supabase
+    .from("stock_batches")
+    .update({
+      quantity: remainingRawQuantity,
+      status: nextRawBatchStatus,
+    })
+    .eq("id", rawBatchRow.id);
+
+  if (rawBatchUpdateError) {
+    throw rawBatchUpdateError;
+  }
+
+  const { error: inboundLotUpdateError } = await supabase
+    .from("inbound_lots")
+    .update({
+      status: remainingRawQuantity <= 0 ? "consumed" : "available",
+    })
+    .eq("id", lotRow.id);
+
+  if (inboundLotUpdateError) {
+    throw inboundLotUpdateError;
+  }
+
   const { error: productBatchError } = await supabase.from("product_batches").insert({
     product_id: product.id,
     stock_batch_id: stockBatchRow.id,
@@ -1610,11 +1703,31 @@ async function saveFinishedBatchToSupabase(entry) {
       animalId: entry.animalId,
       origin: entry.origin,
       barcode: entry.barcodeValue,
+      sourceQuantityUsed: entry.sourceQuantityUsed,
     },
   });
 
   if (productBatchError) {
     throw productBatchError;
+  }
+
+  const { error: movementError } = await supabase.from("inventory_movements").insert([
+    {
+      stock_batch_id: rawBatchRow.id,
+      movement_type: "production_consume",
+      quantity_delta: -Math.abs(Number(entry.sourceQuantityUsed || 0)),
+      note: `Consumed ${entry.sourceQuantityUsed} kg into finished batch ${entry.id}.`,
+    },
+    {
+      stock_batch_id: stockBatchRow.id,
+      movement_type: "production_output",
+      quantity_delta: Number(entry.quantity || 0),
+      note: `Produced ${entry.quantity} ${entry.unit} into finished batch ${entry.id}.`,
+    },
+  ]);
+
+  if (movementError) {
+    throw movementError;
   }
 }
 
@@ -1695,6 +1808,20 @@ function populateSourceLotOptions() {
     .join("");
 }
 
+function syncFinishedBatchSourceDefaults() {
+  if (!finishedSourceLotInput || !finishedSourceQuantityInput) {
+    return;
+  }
+
+  const sourceLot = getInboundLotById(finishedSourceLotInput.value) || inboundLots[0];
+  if (!sourceLot) {
+    return;
+  }
+
+  finishedSourceLotInput.value = sourceLot.id;
+  finishedSourceQuantityInput.value = String(sourceLot.weightKg ?? "");
+}
+
 function populateLabelBatchOptions() {
   if (!labelSourceBatchInput) {
     return;
@@ -1757,6 +1884,8 @@ function hydrateTraceabilityForms() {
   if (finishedSourceLotInput && inboundLots.length && !finishedSourceLotInput.value) {
     finishedSourceLotInput.value = inboundLots[0].id;
   }
+
+  syncFinishedBatchSourceDefaults();
 
   if (labelSourceBatchInput && finishedBatches.length) {
     syncLabelFormToBatch(labelSourceBatchInput.value || finishedBatches[0].id);
@@ -2402,6 +2531,12 @@ if (intakeForm) {
   });
 }
 
+if (finishedSourceLotInput) {
+  finishedSourceLotInput.addEventListener("change", () => {
+    syncFinishedBatchSourceDefaults();
+  });
+}
+
 if (finishedBatchForm) {
   finishedBatchForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2410,6 +2545,7 @@ if (finishedBatchForm) {
     const sourceLotId = finishedSourceLotInput?.value || "";
     const sourceLot = getInboundLotById(sourceLotId);
     const product = findProductByName(productName);
+    const sourceQuantityUsed = Number(finishedSourceQuantityInput?.value);
     const payload = {
       id: document.getElementById("finished-batch-code").value.trim().toUpperCase(),
       product: productName,
@@ -2422,6 +2558,7 @@ if (finishedBatchForm) {
       packedOn: document.getElementById("finished-packed-on").value,
       useBy: document.getElementById("finished-useby").value,
       quantity: Number(document.getElementById("finished-quantity").value),
+      sourceQuantityUsed,
       unit: document.getElementById("finished-unit").value,
       yield: document.getElementById("finished-weight").value.trim(),
       weight: document.getElementById("finished-weight").value.trim(),
@@ -2438,20 +2575,39 @@ if (finishedBatchForm) {
           time: "05:45",
         },
         {
-          label: "Production",
-          detail: document.getElementById("finished-note").value.trim() || "Source stock booked into production.",
+          label: "Production transform",
+          detail:
+            document.getElementById("finished-note").value.trim() ||
+            `${sourceQuantityUsed} kg consumed from ${sourceLot?.rawBatchCode || "raw batch"} into packing run.`,
           time: "08:30",
         },
         {
           label: "Packing",
-          detail: `${document.getElementById("finished-quantity").value} ${document.getElementById("finished-unit").value} packed into finished batch ${document.getElementById("finished-batch-code").value.trim().toUpperCase()}.`,
+          detail: `${document.getElementById("finished-quantity").value} ${document.getElementById("finished-unit").value} produced into finished batch ${document.getElementById("finished-batch-code").value.trim().toUpperCase()}.`,
           time: "11:10",
         },
       ],
     };
 
-    if (!payload.id || !payload.product || !payload.sourceLotId || !payload.packedOn || Number.isNaN(payload.quantity)) {
-      setFinishedBatchFeedback("Choose a product and source lot, then enter a batch code, packed date, and quantity.", "danger");
+    if (
+      !payload.id ||
+      !payload.product ||
+      !payload.sourceLotId ||
+      !payload.packedOn ||
+      Number.isNaN(payload.quantity) ||
+      Number.isNaN(payload.sourceQuantityUsed)
+    ) {
+      setFinishedBatchFeedback("Choose a product and source lot, then enter a batch code, packed date, source quantity, and output quantity.", "danger");
+      return;
+    }
+
+    if (payload.sourceQuantityUsed <= 0) {
+      setFinishedBatchFeedback("Source quantity used must be greater than zero.", "danger");
+      return;
+    }
+
+    if (sourceLot && payload.sourceQuantityUsed > Number(sourceLot.weightKg || 0)) {
+      setFinishedBatchFeedback(`Only ${sourceLot.weightKg} kg remains on the selected source lot.`, "danger");
       return;
     }
 
@@ -2470,7 +2626,11 @@ if (finishedBatchForm) {
       finishedBatches = [payload, ...finishedBatches];
       inboundLots = inboundLots.map((lot) =>
         lot.id === payload.sourceLotId
-          ? { ...lot, status: "Consumed" }
+          ? {
+              ...lot,
+              weightKg: Math.max(0, Number(lot.weightKg || 0) - payload.sourceQuantityUsed),
+              status: Math.max(0, Number(lot.weightKg || 0) - payload.sourceQuantityUsed) <= 0 ? "Consumed" : "Available",
+            }
           : lot,
       );
       persistTraceabilityState();
