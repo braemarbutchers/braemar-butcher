@@ -1415,14 +1415,14 @@ select {
     min-height: 29mm;
     height: 29mm;
     margin: 0;
-    padding: 2mm 2.5mm;
+    padding: 1.5mm 2mm;
     border: 0;
     border-radius: 0;
     color: #000;
     break-inside: avoid;
     display: grid;
-    grid-template-rows: auto auto auto auto 1fr;
-    gap: 1.2mm;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 0.8mm;
     overflow: hidden;
   }
 
@@ -1430,22 +1430,23 @@ select {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 2mm;
-    font-size: 5.5pt;
-    letter-spacing: 0.04em;
+    gap: 1.2mm;
+    font-size: 4.5pt;
+    letter-spacing: 0.02em;
     line-height: 1;
   }
 
   body.printing-label-sheet #label-preview h5 {
     margin: 0;
-    font-size: 11pt;
-    line-height: 1.1;
+    font-size: 8.5pt;
+    line-height: 1;
   }
 
   body.printing-label-sheet #label-preview dl {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1mm 2mm;
+    gap: 0.6mm 1.6mm;
+    margin: 0;
   }
 
   body.printing-label-sheet #label-preview dl div {
@@ -1463,39 +1464,39 @@ select {
   }
 
   body.printing-label-sheet #label-preview dt {
-    font-size: 5pt;
+    font-size: 4pt;
     line-height: 1;
   }
 
   body.printing-label-sheet #label-preview dd {
-    margin-top: 0.4mm;
-    font-size: 6.5pt;
-    line-height: 1.1;
+    margin-top: 0.2mm;
+    font-size: 5pt;
+    line-height: 1;
   }
 
   body.printing-label-sheet #label-preview .label-price-row {
-    margin-top: 0.6mm;
-    padding-top: 1mm;
-    gap: 1.2mm;
+    margin-top: 0;
+    padding-top: 0.6mm;
+    gap: 0.8mm;
     grid-template-columns: auto 1fr;
     align-items: end;
-    border-top-width: 0.35mm;
+    border-top-width: 0.25mm;
   }
 
   body.printing-label-sheet #preview-price {
-    font-size: 10.5pt;
+    font-size: 8pt;
     line-height: 1;
   }
 
   body.printing-label-sheet #label-preview .barcode-bars,
   body.printing-label-sheet #label-preview .barcode-svg img,
   body.printing-label-sheet #label-preview .barcode-svg svg {
-    height: 8mm;
+    height: 5.5mm;
   }
 
   body.printing-label-sheet #label-preview .barcode-value {
-    font-size: 5.5pt;
-    letter-spacing: 0.04em;
+    font-size: 4pt;
+    letter-spacing: 0.02em;
     line-height: 1;
   }
 
