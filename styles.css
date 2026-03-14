@@ -648,6 +648,24 @@ td,
   gap: 14px;
 }
 
+.auth-feedback {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.auth-feedback[data-tone="danger"] {
+  color: #9a2131;
+}
+
+.auth-feedback[data-tone="success"] {
+  color: #1d6a3a;
+}
+
+.dashboard-auth-status {
+  margin-top: 14px;
+}
+
 .hours-card,
 .hours-note {
   padding: 22px;
@@ -723,6 +741,13 @@ td,
 
 .panel-head {
   margin-bottom: 18px;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .inline-field {
@@ -841,6 +866,80 @@ td,
   border-radius: 18px;
   background: rgba(123, 35, 48, 0.05);
   color: var(--muted);
+}
+
+.driver-print-sheet {
+  display: none;
+}
+
+.driver-sheet-header,
+.driver-sheet-summary,
+.driver-stop-head,
+.driver-stop-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.driver-sheet-header,
+.driver-stop-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.driver-sheet-header h2,
+.driver-stop h3 {
+  margin: 0;
+  font-family: "Fraunces", serif;
+}
+
+.driver-sheet-meta,
+.driver-stop-timing {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+
+.driver-sheet-summary,
+.driver-stop-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.driver-stop-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 18px;
+}
+
+.driver-stop {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  break-inside: avoid;
+}
+
+.driver-stop-number,
+.driver-stop-block span,
+.driver-sheet-summary span,
+.driver-stop-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.driver-stop-block {
+  margin-top: 12px;
+}
+
+.driver-stop-block strong,
+.driver-stop-grid strong,
+.driver-stop-timing strong,
+.driver-sheet-summary strong {
+  display: block;
+  margin-top: 4px;
 }
 
 table {
@@ -1051,6 +1150,8 @@ select {
   .delivery-summary,
   .route-overview,
   .delivery-card-meta,
+  .driver-sheet-summary,
+  .driver-stop-grid,
   .product-grid,
   .info-grid,
   .hours-grid,
@@ -1102,7 +1203,62 @@ select {
     width: 100%;
   }
 
+  .panel-actions,
+  .driver-sheet-header,
+  .driver-stop-head {
+    display: grid;
+  }
+
   .inline-field {
     min-width: 0;
+  }
+}
+
+@media print {
+  body.printing-driver-sheet {
+    background: #fff;
+  }
+
+  body.printing-driver-sheet .page-shell > *:not(main),
+  body.printing-driver-sheet main > *:not(.operations),
+  body.printing-driver-sheet .section-heading,
+  body.printing-driver-sheet .deliveries-grid,
+  body.printing-driver-sheet .tab-panel:not(#deliveries-panel),
+  body.printing-driver-sheet .topbar,
+  body.printing-driver-sheet .hero {
+    display: none !important;
+  }
+
+  body.printing-driver-sheet .page-shell,
+  body.printing-driver-sheet .section,
+  body.printing-driver-sheet .operations,
+  body.printing-driver-sheet #deliveries-panel {
+    margin: 0;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+
+  body.printing-driver-sheet #deliveries-panel {
+    display: block !important;
+  }
+
+  body.printing-driver-sheet .driver-print-sheet {
+    display: grid !important;
+    gap: 18px;
+    color: #000;
+  }
+
+  body.printing-driver-sheet .driver-stop,
+  body.printing-driver-sheet .driver-sheet-summary > div {
+    border-color: rgba(0, 0, 0, 0.18);
+  }
+
+  body.printing-driver-sheet .driver-sheet-summary > div {
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
   }
 }

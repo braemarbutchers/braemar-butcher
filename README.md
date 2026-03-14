@@ -69,10 +69,12 @@ The repo also includes a lightweight serverless endpoint at [api/config.js](/Use
 1. Create a Supabase project
 2. Copy the project URL and keys into `.env.local`
 3. Apply [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql)
-4. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
+4. Apply [supabase/migrations/202603130002_staff_access_policies.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130002_staff_access_policies.sql)
+5. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
 
 If you use the Supabase CLI locally, the project is already laid out for `supabase start`, `supabase db reset`, and future migrations.
 The storefront fetches live product data through Supabase using the public keys exposed by [api/config.js](/Users/marksmith/braemar-butcher/api/config.js), while the rest of the dashboard remains prototype-only until more backend tables are added.
+Staff login uses Supabase Auth. Create staff auth users in the Supabase dashboard with emails that match the seeded `app_users` staff records, such as `admin@braemarbutcher.co.uk`, `counter@braemarbutcher.co.uk`, or `production@braemarbutcher.co.uk`.
 
 ## Database foundation
 

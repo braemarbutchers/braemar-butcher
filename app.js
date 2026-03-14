@@ -189,6 +189,7 @@ let deliveryOrders = [
     },
   },
 ];
+let supabaseClientPromise;
 
 const basket = new Map();
 const stockActivity = [
@@ -215,8 +216,24 @@ const deliveryList = document.getElementById("delivery-list");
 const routeBadge = document.getElementById("route-badge");
 const routeOverview = document.getElementById("route-overview");
 const routeList = document.getElementById("route-list");
+const printDeliverySheetButton = document.getElementById("print-delivery-sheet");
+const driverPrintSheet = document.getElementById("driver-print-sheet");
 const shopHeading = document.querySelector("#shop .section-heading h3");
 const heroText = document.querySelector(".retail-section .section-heading .eyebrow");
+const staffAuthForm = document.getElementById("staff-auth-form");
+const staffEmailInput = document.getElementById("staff-email");
+const staffPasswordInput = document.getElementById("staff-password");
+const authFeedback = document.getElementById("auth-feedback");
+const dashboardAuthStatus = document.getElementById("dashboard-auth-status");
+const signOutButton = document.getElementById("sign-out-button");
+const operationsSection = document.getElementById("operations");
+
+const isDashboardPage = Boolean(operationsSection);
+const isStaffLoginPage = Boolean(staffAuthForm);
+
+if (operationsSection) {
+  operationsSection.hidden = true;
+}
 
 function slugifyProductName(value) {
   return value
@@ -343,6 +360,12 @@ function formatRouteDate(value) {
     month: "long",
     timeZone: "Europe/London",
   });
+}
+
+function formatAddress(address) {
+  return [address?.line1, address?.line2, address?.city, address?.county, address?.postcode]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function titleCaseStatus(value) {
@@ -487,9 +510,111 @@ async function getSupabaseConfig() {
   return response.json();
 }
 
+async function getSupabaseClient() {
+  if (!supabaseClientPromise) {
+    supabaseClientPromise = getSupabaseConfig().then((config) =>
+      window.supabase.createClient(config.supabaseUrl, config.supabaseKey),
+    );
+  }
+
+  return supabaseClientPromise;
+}
+
+function setAuthFeedback(message, tone = "muted") {
+  if (!authFeedback) {
+    return;
+  }
+
+  authFeedback.textContent = message;
+  authFeedback.dataset.tone = tone;
+}
+
+function setDashboardAuthStatus(message, tone = "muted") {
+  if (!dashboardAuthStatus) {
+    return;
+  }
+
+  dashboardAuthStatus.textContent = message;
+  dashboardAuthStatus.dataset.tone = tone;
+}
+
+async function getCurrentStaffAccount(supabase) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    throw userError;
+  }
+
+  if (!user?.email) {
+    return null;
+  }
+
+  const email = user.email.toLowerCase();
+  const { data, error } = await supabase
+    .from("app_users")
+    .select(
+      `
+        id,
+        email,
+        role,
+        status,
+        staff_profiles(first_name, last_name, job_title, department)
+      `,
+    )
+    .eq("email", email)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data || !["admin", "staff"].includes(data.role) || data.status !== "active") {
+    return null;
+  }
+
+  return {
+    ...data,
+    authEmail: email,
+  };
+}
+
+async function ensureStaffSession(supabase) {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  const staffAccount = await getCurrentStaffAccount(supabase);
+  if (!staffAccount) {
+    await supabase.auth.signOut();
+    return null;
+  }
+
+  return staffAccount;
+}
+
+async function redirectToStaffLogin() {
+  const loginUrl = new URL("staff-login.html", window.location.href);
+  if (isDashboardPage) {
+    loginUrl.searchParams.set("next", "dashboard.html");
+  }
+
+  window.location.href = loginUrl.toString();
+}
+
 async function fetchLiveProducts() {
-  const config = await getSupabaseConfig();
-  const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
+  const supabase = await getSupabaseClient();
   const { data, error } = await supabase
     .from("products")
     .select("sku, name, description, price")
@@ -507,8 +632,7 @@ async function fetchLiveProducts() {
 }
 
 async function fetchLiveDeliveries() {
-  const config = await getSupabaseConfig();
-  const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
+  const supabase = await getSupabaseClient();
   const { data, error } = await supabase
     .from("customer_orders")
     .select(
@@ -701,7 +825,7 @@ function renderStockActivity() {
 }
 
 function renderDeliveries() {
-  if (!deliverySummary || !deliveryList || !routeOverview || !routeList || !routeBadge) {
+  if (!deliverySummary || !deliveryList || !routeOverview || !routeList || !routeBadge || !driverPrintSheet) {
     return;
   }
 
@@ -731,6 +855,18 @@ function renderDeliveries() {
     deliveryList.innerHTML = `<div class="empty-state">No delivery orders are booked for this date.</div>`;
     routeOverview.innerHTML = `<div class="empty-state">Choose another date to build a route.</div>`;
     routeList.innerHTML = "";
+    driverPrintSheet.innerHTML = `
+      <header class="driver-sheet-header">
+        <div>
+          <p class="eyebrow">Driver sheet</p>
+          <h2>No deliveries booked</h2>
+        </div>
+        <div class="driver-sheet-meta">
+          <strong>${formatRouteDate(selectedDate)}</strong>
+          <span>Davidson's Family Butcher</span>
+        </div>
+      </header>
+    `;
     return;
   }
 
@@ -789,6 +925,95 @@ function renderDeliveries() {
       `,
     )
     .join("");
+
+  driverPrintSheet.innerHTML = `
+    <header class="driver-sheet-header">
+      <div>
+        <p class="eyebrow">Driver sheet</p>
+        <h2>${formatRouteDate(selectedDate)} delivery run</h2>
+      </div>
+      <div class="driver-sheet-meta">
+        <strong>${route.length} stop${route.length === 1 ? "" : "s"}</strong>
+        <span>${totalDistance.toFixed(1)} km estimated route</span>
+        <span>Depart 09:00 from shop</span>
+      </div>
+    </header>
+    <section class="driver-sheet-summary">
+      <div>
+        <span>Total order value</span>
+        <strong>${formatCurrency(totalValue)}</strong>
+      </div>
+      <div>
+        <span>Final ETA</span>
+        <strong>${route[route.length - 1].eta}</strong>
+      </div>
+      <div>
+        <span>Printed</span>
+        <strong>${new Date().toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/London",
+        })}</strong>
+      </div>
+    </section>
+    <ol class="driver-stop-list">
+      ${route
+        .map(
+          (delivery) => `
+            <li class="driver-stop">
+              <div class="driver-stop-head">
+                <div>
+                  <span class="driver-stop-number">Stop ${delivery.stopNumber}</span>
+                  <h3>${delivery.customerName}</h3>
+                </div>
+                <div class="driver-stop-timing">
+                  <strong>ETA ${delivery.eta}</strong>
+                  <span>${titleCaseStatus(delivery.orderStatus)}</span>
+                </div>
+              </div>
+              <div class="driver-stop-grid">
+                <div>
+                  <span>Order</span>
+                  <strong>${delivery.orderNumber}</strong>
+                </div>
+                <div>
+                  <span>Contact</span>
+                  <strong>${delivery.contactName}</strong>
+                </div>
+                <div>
+                  <span>Phone</span>
+                  <strong>${delivery.phone || "Not recorded"}</strong>
+                </div>
+                <div>
+                  <span>Value</span>
+                  <strong>${formatCurrency(delivery.totalAmount)}</strong>
+                </div>
+                <div>
+                  <span>Requested</span>
+                  <strong>${formatDeliveryWindow(delivery.requestedFor)}</strong>
+                </div>
+                <div>
+                  <span>Leg distance</span>
+                  <strong>${delivery.legDistanceKm.toFixed(1)} km</strong>
+                </div>
+              </div>
+              <div class="driver-stop-block">
+                <span>Address</span>
+                <strong>${formatAddress(delivery.address)}</strong>
+              </div>
+              <div class="driver-stop-block">
+                <span>Driver notes</span>
+                <strong>${delivery.address.instructions || delivery.note}</strong>
+              </div>
+            </li>
+          `,
+        )
+        .join("")}
+    </ol>
+  `;
 }
 
 function renderBatches(activeBatchId = batches[0].id) {
@@ -868,7 +1093,6 @@ function renderStorefront() {
   renderProducts();
   renderFeaturedProducts();
   renderBasket();
-  renderDeliveries();
   renderInventory();
   renderStockActivity();
   renderBatches();
@@ -957,6 +1181,17 @@ if (deliveryDateInput) {
   });
 }
 
+if (printDeliverySheetButton) {
+  printDeliverySheetButton.addEventListener("click", () => {
+    document.body.classList.add("printing-driver-sheet");
+    window.print();
+  });
+}
+
+window.addEventListener("afterprint", () => {
+  document.body.classList.remove("printing-driver-sheet");
+});
+
 const labelForm = document.getElementById("label-form");
 if (labelForm) {
   labelForm.addEventListener("submit", (event) => {
@@ -980,30 +1215,106 @@ if (printButton) {
   });
 }
 
-renderStorefront();
-showLiveDataState(false);
+if (staffAuthForm) {
+  staffAuthForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setAuthFeedback("Signing in.", "muted");
 
-fetchLiveProducts()
-  .then(() => {
+    try {
+      const supabase = await getSupabaseClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email: staffEmailInput.value.trim(),
+        password: staffPasswordInput.value,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const staffAccount = await ensureStaffSession(supabase);
+      if (!staffAccount) {
+        setAuthFeedback("This account is not an active staff user in the operations database.", "danger");
+        return;
+      }
+
+      setAuthFeedback(`Signed in as ${staffAccount.email}. Redirecting to the dashboard.`, "success");
+      window.location.href = new URLSearchParams(window.location.search).get("next") || "dashboard.html";
+    } catch (error) {
+      setAuthFeedback(error.message || "Unable to sign in with Supabase Auth.", "danger");
+    }
+  });
+}
+
+if (signOutButton) {
+  signOutButton.addEventListener("click", async () => {
+    try {
+      const supabase = await getSupabaseClient();
+      await supabase.auth.signOut();
+    } finally {
+      window.location.href = "staff-login.html";
+    }
+  });
+}
+
+async function bootstrapPage() {
+  renderStorefront();
+  showLiveDataState(false);
+
+  try {
+    await fetchLiveProducts();
     renderStorefront();
     showLiveDataState(true);
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error("Supabase product sync failed:", error);
-  });
+  }
 
-fetchLiveDeliveries()
-  .then(() => {
+  if (isStaffLoginPage) {
+    try {
+      const supabase = await getSupabaseClient();
+      const staffAccount = await ensureStaffSession(supabase);
+      if (staffAccount) {
+        setAuthFeedback(`Already signed in as ${staffAccount.email}. Redirecting to the dashboard.`, "success");
+        window.location.href = new URLSearchParams(window.location.search).get("next") || "dashboard.html";
+        return;
+      }
+    } catch (error) {
+      console.error("Staff session check failed:", error);
+      setAuthFeedback("Supabase session check failed. Try signing in again.", "danger");
+    }
+  }
+
+  if (!isDashboardPage) {
+    return;
+  }
+
+  try {
+    const supabase = await getSupabaseClient();
+    const staffAccount = await ensureStaffSession(supabase);
+    if (!staffAccount) {
+      await redirectToStaffLogin();
+      return;
+    }
+
+    operationsSection.hidden = false;
+    setDashboardAuthStatus(
+      `Signed in as ${staffAccount.staff_profiles?.first_name || staffAccount.email}. Live operations data is enabled.`,
+      "success",
+    );
+
+    await fetchLiveDeliveries();
     if (deliveryDateInput && !getDeliveriesForDate(deliveryDateInput.value).length) {
       deliveryDateInput.value = formatDateForInput(deliveryOrders[0]?.requestedFor || new Date());
     }
-
-    renderDeliveries();
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error("Supabase delivery sync failed:", error);
-    renderDeliveries();
-  });
+    setDashboardAuthStatus(error.message || "Live delivery sync failed. Showing fallback dashboard data.", "danger");
+    operationsSection.hidden = false;
+  }
+
+  renderDeliveries();
+}
+
+bootstrapPage();
 
 if (window.location.hash === "#traceability") {
   setActiveTab("traceability");

@@ -25,4 +25,5 @@ jobs:
           test -f app.js
           test -f supabase/config.toml
           test -f supabase/migrations/202603130001_initial_schema.sql
+          test -f supabase/migrations/202603130002_staff_access_policies.sql
           test -f supabase/seed.sql

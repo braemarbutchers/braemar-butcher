@@ -49,15 +49,16 @@
                 <p class="eyebrow">Staff login</p>
                 <h4>Operations access</h4>
               </div>
-              <form class="auth-form" action="dashboard.html">
+              <form class="auth-form" id="staff-auth-form">
                 <label>
                   Staff email
-                  <input type="email" value="production@braemarbutcher.co.uk" />
+                  <input id="staff-email" type="email" value="production@braemarbutcher.co.uk" autocomplete="email" />
                 </label>
                 <label>
                   Password
-                  <input type="password" value="prototype" />
+                  <input id="staff-password" type="password" value="" autocomplete="current-password" />
                 </label>
+                <p class="auth-feedback" id="auth-feedback">Sign in with a staff user created in Supabase Auth.</p>
                 <button type="submit" class="button primary full-width">Open dashboard</button>
               </form>
             </section>

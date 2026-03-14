@@ -24,6 +24,7 @@
           <a href="dashboard.html">Dashboard</a>
           <a href="dashboard.html#traceability" data-open-tab="traceability">Tracing</a>
           <a href="dashboard.html#labels" data-open-tab="labels">Labels</a>
+          <button id="sign-out-button" type="button" class="button secondary">Sign out</button>
         </nav>
       </header>
 
@@ -36,6 +37,7 @@
               This is now a dedicated staff page rather than part of the public web shop. In a real build,
               this page would sit behind authenticated roles for counter staff, production and admin.
             </p>
+            <p class="auth-feedback dashboard-auth-status" id="dashboard-auth-status">Checking staff access.</p>
           </div>
           <aside class="hero-panel compact-panel">
             <div class="stat-card">
@@ -85,12 +87,16 @@
                     <p class="eyebrow">Optimised run</p>
                     <h4>Best route order</h4>
                   </div>
-                  <span class="pill" id="route-badge">Awaiting route</span>
+                  <div class="panel-actions">
+                    <span class="pill" id="route-badge">Awaiting route</span>
+                    <button id="print-delivery-sheet" type="button" class="button secondary">Print Driver Sheet</button>
+                  </div>
                 </div>
                 <div class="route-overview" id="route-overview"></div>
                 <ol class="route-list" id="route-list"></ol>
               </section>
             </div>
+            <section class="driver-print-sheet" id="driver-print-sheet" aria-hidden="true"></section>
           </div>
 
           <div class="tab-panel active" id="stock-panel">
