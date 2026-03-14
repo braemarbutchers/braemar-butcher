@@ -88,53 +88,10 @@ const inventory = [
   { sku: "DB-SIR-05", product: "Sirloin Family Box", onHand: 8, threshold: 6 },
 ];
 
-const batches = [
-  {
-    id: "DB-260313-PIE",
-    product: "Family Steak Pie",
-    origin: "Braemar Production Kitchen",
-    animalId: "BEEF-TRIM-4421",
-    status: "Packed",
-    yield: "28 pies",
-    timeline: [
-      { label: "Trim allocation", detail: "Beef trim released from morning cutting list into pie production.", time: "06:15" },
-      { label: "Cook room", detail: "Pie filling cooked and logged against batch recipe sheet.", time: "07:05" },
-      { label: "Assembly", detail: "Pastry lids sealed and portion count confirmed by station 2.", time: "09:20" },
-      { label: "Packaging", detail: "Counter labels applied and pies transferred to chilled finished goods.", time: "11:10" },
-    ],
-  },
-  {
-    id: "DB-260313-LM",
-    product: "Lamb Loin Chops",
-    origin: "Braeside Lamb",
-    animalId: "UK7720 900122",
-    status: "Picked",
-    yield: "19 trays",
-    timeline: [
-      { label: "Farm intake", detail: "Collected from Braeside Lamb with movement docs verified.", time: "05:40" },
-      { label: "Boning", detail: "Trimmed and frenched for retail packs.", time: "08:10" },
-      { label: "Packing", detail: "Retail labels allocated to lot 19.", time: "10:25" },
-      { label: "Picking", detail: "Reserved for webshop orders and two trade accounts.", time: "13:00" },
-    ],
-  },
-  {
-    id: "DB-260313-VN",
-    product: "Braemar Venison Box",
-    origin: "Mar Lodge Estate",
-    animalId: "ESTATE-VN-184",
-    status: "Awaiting dispatch",
-    yield: "12 boxes",
-    timeline: [
-      { label: "Field collection", detail: "Estate batch logged with stalker ID and timestamp.", time: "04:55" },
-      { label: "Inspection", detail: "Game handling check complete before breakdown.", time: "06:45" },
-      { label: "Box assembly", detail: "Mixed cuts allocated to 12 webshop boxes.", time: "10:40" },
-      { label: "Dispatch ready", detail: "Stored in courier bay for next-day chilled collection.", time: "14:15" },
-    ],
-  },
-];
-
 const LOCAL_PRODUCTS_STORAGE_KEY = "braemar.customProducts";
 const LOCAL_PRODUCT_IMAGES_STORAGE_KEY = "braemar.productImages";
+const LOCAL_INBOUND_LOTS_STORAGE_KEY = "braemar.inboundLots";
+const LOCAL_FINISHED_BATCHES_STORAGE_KEY = "braemar.finishedBatches";
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
 const CODE39_PATTERNS = {
   "0": "nnnwwnwnn",
@@ -185,7 +142,135 @@ const CODE39_PATTERNS = {
 
 let products = [...fallbackProducts];
 let liveProductsEnabled = false;
+let traceabilityLiveEnabled = false;
 let editingProductSku = "";
+let inboundLots = [
+  {
+    id: "intake-braeside-lamb-260313",
+    intakeCode: "INT-260313-LAMB-01",
+    supplier: "Braeside Lamb",
+    sourceType: "carcass",
+    species: "Lamb",
+    cutDescription: "Loin and saddle allocation",
+    supplierLotCode: "BRS-LM-4421",
+    animalId: "UK7720 900122",
+    receivedAt: "2026-03-13",
+    useBy: "2026-03-19",
+    weightKg: 24.5,
+    note: "Movement docs verified at intake and chill temp logged.",
+    rawBatchCode: "RAW-260313-LM-01",
+    status: "Available",
+  },
+  {
+    id: "intake-braemar-beef-260313",
+    intakeCode: "INT-260313-BEEF-01",
+    supplier: "Braemar Production Kitchen",
+    sourceType: "boxed_meat",
+    species: "Beef",
+    cutDescription: "Trim for pie filling",
+    supplierLotCode: "BEEF-TRIM-4421",
+    animalId: "BEEF-TRIM-4421",
+    receivedAt: "2026-03-13",
+    useBy: "2026-03-18",
+    weightKg: 18.2,
+    note: "Trim released from cutting room to cooked pie mix.",
+    rawBatchCode: "RAW-260313-BF-01",
+    status: "Consumed",
+  },
+  {
+    id: "intake-mar-lodge-260313",
+    intakeCode: "INT-260313-VEN-01",
+    supplier: "Mar Lodge Estate",
+    sourceType: "game",
+    species: "Venison",
+    cutDescription: "Mixed estate venison cuts",
+    supplierLotCode: "ESTATE-VN-184",
+    animalId: "ESTATE-VN-184",
+    receivedAt: "2026-03-13",
+    useBy: "2026-03-17",
+    weightKg: 32.4,
+    note: "Game handling inspection complete before breakdown.",
+    rawBatchCode: "RAW-260313-VN-01",
+    status: "Available",
+  },
+];
+let finishedBatches = [
+  {
+    id: "DB-260313-PIE",
+    product: "Family Steak Pie",
+    productSku: "DB-PIE-01",
+    sourceLotId: "intake-braemar-beef-260313",
+    sourceIntakeCode: "INT-260313-BEEF-01",
+    sourceBatchCode: "RAW-260313-BF-01",
+    origin: "Braemar Production Kitchen",
+    animalId: "BEEF-TRIM-4421",
+    packedOn: "2026-03-13",
+    useBy: "2026-03-20",
+    quantity: 28,
+    unit: "pack",
+    yield: "28 pies",
+    weight: "28 pies",
+    status: "Packed",
+    barcodeValue: "DB-PIE-01",
+    note: "Pie filling cooked and packed into chilled finished goods.",
+    timeline: [
+      { label: "Intake", detail: "Beef trim intake received and checked into raw batch RAW-260313-BF-01.", time: "05:55" },
+      { label: "Trim allocation", detail: "Beef trim released from morning cutting list into pie production.", time: "06:15" },
+      { label: "Cook room", detail: "Pie filling cooked and logged against batch recipe sheet.", time: "07:05" },
+      { label: "Packaging", detail: "Counter labels applied and pies transferred to chilled finished goods.", time: "11:10" },
+    ],
+  },
+  {
+    id: "DB-260313-LM",
+    product: "Lamb Loin Chops",
+    productSku: "BB-LAM-02",
+    sourceLotId: "intake-braeside-lamb-260313",
+    sourceIntakeCode: "INT-260313-LAMB-01",
+    sourceBatchCode: "RAW-260313-LM-01",
+    origin: "Braeside Lamb",
+    animalId: "UK7720 900122",
+    packedOn: "2026-03-13",
+    useBy: "2026-03-19",
+    quantity: 19,
+    unit: "tray",
+    yield: "19 trays",
+    weight: "19 trays",
+    status: "Picked",
+    barcodeValue: "BB-LAM-02",
+    note: "Trimmed and packed for retail trays.",
+    timeline: [
+      { label: "Farm intake", detail: "Collected from Braeside Lamb with movement docs verified.", time: "05:40" },
+      { label: "Boning", detail: "Trimmed and frenched for retail packs.", time: "08:10" },
+      { label: "Packing", detail: "Retail labels allocated to lot 19.", time: "10:25" },
+      { label: "Picking", detail: "Reserved for webshop orders and two trade accounts.", time: "13:00" },
+    ],
+  },
+  {
+    id: "DB-260313-VN",
+    product: "Braemar Venison Box",
+    productSku: "DB-VEN-04",
+    sourceLotId: "intake-mar-lodge-260313",
+    sourceIntakeCode: "INT-260313-VEN-01",
+    sourceBatchCode: "RAW-260313-VN-01",
+    origin: "Mar Lodge Estate",
+    animalId: "ESTATE-VN-184",
+    packedOn: "2026-03-13",
+    useBy: "2026-03-17",
+    quantity: 12,
+    unit: "box",
+    yield: "12 boxes",
+    weight: "12 boxes",
+    status: "Awaiting dispatch",
+    barcodeValue: "DB-VEN-04",
+    note: "Mixed cuts assembled into webshop boxes.",
+    timeline: [
+      { label: "Field collection", detail: "Estate batch logged with stalker ID and timestamp.", time: "04:55" },
+      { label: "Inspection", detail: "Game handling check complete before breakdown.", time: "06:45" },
+      { label: "Box assembly", detail: "Mixed cuts allocated to 12 webshop boxes.", time: "10:40" },
+      { label: "Dispatch ready", detail: "Stored in courier bay for next-day chilled collection.", time: "14:15" },
+    ],
+  },
+];
 let deliveryOrders = [
   {
     id: "DEL-001",
@@ -265,6 +350,7 @@ const totalValue = document.getElementById("total-value");
 const inventoryTable = document.getElementById("inventory-table");
 const stockProduct = document.getElementById("stock-product");
 const stockActivityLog = document.getElementById("stock-activity");
+const intakeList = document.getElementById("intake-list");
 const batchList = document.getElementById("batch-list");
 const traceTitle = document.getElementById("trace-title");
 const traceMeta = document.getElementById("trace-meta");
@@ -294,6 +380,13 @@ const productSubmitButton = document.getElementById("product-submit-button");
 const productCancelButton = document.getElementById("product-cancel-button");
 const productFormFeedback = document.getElementById("product-form-feedback");
 const productAdminList = document.getElementById("product-admin-list");
+const intakeForm = document.getElementById("intake-form");
+const intakeFeedback = document.getElementById("intake-feedback");
+const finishedBatchForm = document.getElementById("finished-batch-form");
+const finishedBatchFeedback = document.getElementById("finished-batch-feedback");
+const finishedProductInput = document.getElementById("finished-product");
+const finishedSourceLotInput = document.getElementById("finished-source-lot");
+const labelSourceBatchInput = document.getElementById("label-source-batch");
 const labelBarcodeInput = document.getElementById("label-barcode");
 const shopHeading = document.querySelector("#shop .section-heading h3");
 const heroText = document.querySelector(".retail-section .section-heading .eyebrow");
@@ -389,6 +482,18 @@ function generateCode39Svg(value) {
   )}" preserveAspectRatio="none">${bars}</svg>`;
 }
 
+function buildBarcodeImageMarkup(value) {
+  const normalizedValue = normalizeBarcodeValue(value);
+  const svgMarkup = generateCode39Svg(normalizedValue);
+  if (!svgMarkup) {
+    return "";
+  }
+
+  return `<img alt="Barcode ${escapeSvgText(normalizedValue)}" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+    svgMarkup,
+  )}" />`;
+}
+
 function renderBarcodePreview(value) {
   if (!previewBarcodeSvg || !previewBarcodeValue) {
     return;
@@ -397,7 +502,7 @@ function renderBarcodePreview(value) {
   const normalizedValue = normalizeBarcodeValue(value);
   previewBarcodeValue.textContent = normalizedValue || "NO TILL CODE";
   previewBarcodeSvg.innerHTML = normalizedValue
-    ? generateCode39Svg(normalizedValue)
+    ? buildBarcodeImageMarkup(normalizedValue)
     : '<div class="empty-state">Add a till code to print a scannable barcode.</div>';
 }
 

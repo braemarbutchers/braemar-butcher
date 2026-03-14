@@ -1196,6 +1196,7 @@ select {
   gap: 8px;
 }
 
+.barcode-svg img,
 .barcode-svg svg {
   display: block;
   width: 100%;
@@ -1458,6 +1459,7 @@ select {
     line-height: 1;
   }
 
+  body.printing-label-sheet #label-preview .barcode-svg img,
   body.printing-label-sheet #label-preview .barcode-svg svg {
     height: 8mm;
   }
