@@ -37,71 +37,71 @@ The app uses in-browser sample data and demonstrates the intended workflows:
 - Inspect batch origin and chain-of-custody events
 - Update and print a product label preview
 
-## GitHub, Vercel, and Supabase setup
+## Vercel and Supabase setup
 
 This repository is now structured for:
 
-- GitHub source control with a basic CI workflow in [.github/workflows/ci.yml](/Users/marksmith/braemar-butcher/.github/workflows/ci.yml)
 - Vercel static deployment with route rewrites in [vercel.json](/Users/marksmith/braemar-butcher/vercel.json)
-- Supabase local or hosted projects with config, migration, and seed files in [/supabase](/Users/marksmith/braemar-butcher/supabase)
-
-### GitHub
-
-1. Run `git init -b main`
-2. Run `git add .`
-3. Run `git commit -m "Initial project setup"`
-4. Create a GitHub repository and connect it with `git remote add origin <your-repo-url>`
-5. Run `git push -u origin main`
+- A lightweight runtime config endpoint in [api/config.js](/Users/marksmith/braemar-butcher/api/config.js)
+- Supabase local or hosted projects with config, migration, and seed files in [supabase](/Users/marksmith/braemar-butcher/supabase)
 
 ### Vercel
 
-1. Create a new Vercel project and import the GitHub repository
+1. Create a new Vercel project and import this repository
 2. Leave the framework preset as `Other`
 3. Keep the root directory as the repository root
-4. Add any required env vars from [.env.example](/Users/marksmith/braemar-butcher/.env.example)
+4. Set `SUPABASE_URL` and either `SUPABASE_ANON_KEY` or `SUPABASE_PUBLISHABLE_KEY`
 5. Deploy
 
 Vercel will serve the static site and map `/shop`, `/visit`, `/staff`, and `/dashboard` to the existing HTML files.
-The repo also includes a lightweight serverless endpoint at [api/config.js](/Users/marksmith/braemar-butcher/api/config.js) so the browser can load the public Supabase URL and anon key from Vercel environment variables.
+The [api/config.js](/Users/marksmith/braemar-butcher/api/config.js) endpoint exposes the public Supabase URL and browser key from Vercel environment variables.
 
 ### Supabase
 
-1. Create a Supabase project
-2. Copy the project URL and keys into `.env.local`
-3. Apply [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql)
-4. Apply [supabase/migrations/202603130002_staff_access_policies.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130002_staff_access_policies.sql)
-5. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
+1. Create a Supabase project or run `supabase start` locally
+2. Apply [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql)
+3. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
 
-If you use the Supabase CLI locally, the project is already laid out for `supabase start`, `supabase db reset`, and future migrations.
-The storefront fetches live product data through Supabase using the public keys exposed by [api/config.js](/Users/marksmith/braemar-butcher/api/config.js), while the rest of the dashboard remains prototype-only until more backend tables are added.
-Staff login uses Supabase Auth. Create staff auth users in the Supabase dashboard with emails that match the seeded `app_users` staff records, such as `admin@braemarbutcher.co.uk`, `counter@braemarbutcher.co.uk`, or `production@braemarbutcher.co.uk`.
+The migration uses `auth.users` for sign-in and creates app-level profile tables plus row-level security in `public`.
+The seed creates sample auth users for `admin@braemarbutcher.co.uk`, `counter@braemarbutcher.co.uk`, `production@braemarbutcher.co.uk`, `alice.macleod@example.com`, and `thefifearms@example.com`.
 
-## Database foundation
+## Supabase foundation
 
-The `/database` folder now contains a PostgreSQL starter schema and seed data for the backend:
+The backend is now structured for Supabase:
 
-- [database/schema.sql](/Users/marksmith/braemar-butcher/database/schema.sql): core tables, constraints, indexes, and `updated_at` triggers
-- [database/seed.sql](/Users/marksmith/braemar-butcher/database/seed.sql): sample admin, staff, client, product, order, saved list, invoice, and payment records
+- [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql): schema, triggers, helper functions, and row-level security policies
+- [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql): seeded auth users, profiles, products, orders, saved lists, invoices, and payments
+- [supabase/config.toml](/Users/marksmith/braemar-butcher/supabase/config.toml): local Supabase CLI configuration
 
-The schema covers the main roles and customer account flows:
+The Supabase model uses:
 
-- `app_users`: shared login table for admin, staff, and client accounts
-- `staff_profiles`: operational permissions for stock, order, client, and billing work
-- `client_profiles` and `client_addresses`: client account details and default billing or delivery destinations
-- `customer_orders` and `order_items`: ordering history and fulfilment records
-- `saved_lists` and `saved_list_items`: repeat-order lists for quick reordering
-- `invoices`, `invoice_items`, and `invoice_payments`: invoice history and payment tracking
+- `auth.users` as the source of truth for sign-in accounts
+- `public.profiles` for app roles: admin, staff, and client
+- `public.staff_profiles` for operational permissions
+- `public.client_profiles` and `public.client_addresses` for client account data
+- `public.customer_orders` and `public.order_items` for order history
+- `public.saved_lists` and `public.saved_list_items` for fast repeat ordering
+- `public.invoices`, `public.invoice_items`, and `public.invoice_payments` for billing history
 
-This gives the future backend enough structure to support:
+Role-aware row-level security is included so:
 
-- Admin access to staff and client accounts
-- Staff handling of orders, fulfilment, invoicing, and client support
-- Client login to place orders, view previous orders, reuse saved lists, and review invoices
+- admins can manage the full dataset
+- staff access is permission-based for inventory, orders, clients, and billing
+- clients can only view and manage their own account, addresses, orders, saved lists, and invoices
+
+## Local setup
+
+With the Supabase CLI installed, use:
+
+1. `supabase start`
+2. `supabase db reset`
+
+The seed creates sample accounts with the password `ChangeMe123!`. Change those before any non-local use.
 
 ## What still needs a real backend
 
-- Authentication implementation on top of the new user tables
-- API endpoints or an ORM layer wired to the SQL schema
+- Frontend auth and data fetching wired to Supabase from the app
+- API routes or server actions for privileged admin or staff workflows on Vercel
 - Persistent inventory, batch, and traceability data connected to the live dashboard
 - Barcode or QR generation tied to real trace records
 - Label printer integration

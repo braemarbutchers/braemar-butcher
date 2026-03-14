@@ -22,6 +22,7 @@
         <nav class="topnav" aria-label="Primary">
           <a href="index.html">View site</a>
           <a href="dashboard.html">Dashboard</a>
+          <a href="dashboard.html#products" data-open-tab="products">Products</a>
           <a href="dashboard.html#traceability" data-open-tab="traceability">Tracing</a>
           <a href="dashboard.html#labels" data-open-tab="labels">Labels</a>
           <button id="sign-out-button" type="button" class="button secondary">Sign out</button>
@@ -59,6 +60,7 @@
             </div>
             <div class="tablist" role="tablist" aria-label="Back office modules">
               <button class="tab" data-tab="deliveries" role="tab" aria-selected="false">Deliveries</button>
+              <button class="tab" data-tab="products" role="tab" aria-selected="false">Products</button>
               <button class="tab active" data-tab="stock" role="tab" aria-selected="true">Stock</button>
               <button class="tab" data-tab="traceability" role="tab" aria-selected="false">Tracing</button>
               <button class="tab" data-tab="labels" role="tab" aria-selected="false">Labels</button>
@@ -97,6 +99,73 @@
               </section>
             </div>
             <section class="driver-print-sheet" id="driver-print-sheet" aria-hidden="true"></section>
+          </div>
+
+          <div class="tab-panel" id="products-panel">
+            <div class="panel-grid">
+              <section class="panel action-panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Catalogue</p>
+                  <h4>Add a new product</h4>
+                </div>
+                <form id="product-form">
+                  <label>
+                    SKU
+                    <input id="product-sku" type="text" value="DB-BUR-07" required />
+                  </label>
+                  <label>
+                    Product name
+                    <input id="product-name" type="text" value="Beef Burgers" required />
+                  </label>
+                  <label>
+                    Description
+                    <input
+                      id="product-description"
+                      type="text"
+                      value="Hand-pressed beef burgers prepared fresh for grill packs and counter sales."
+                    />
+                  </label>
+                  <label>
+                    Unit
+                    <select id="product-unit">
+                      <option value="item">Item</option>
+                      <option value="pack" selected>Pack</option>
+                      <option value="box">Box</option>
+                      <option value="kg">Kg</option>
+                      <option value="tray">Tray</option>
+                    </select>
+                  </label>
+                  <label>
+                    Price
+                    <input id="product-price" type="number" min="0" step="0.01" value="6.95" required />
+                  </label>
+                  <label>
+                    Opening stock
+                    <input id="product-stock" type="number" min="0" step="1" value="12" required />
+                  </label>
+                  <label>
+                    Low stock threshold
+                    <input id="product-threshold" type="number" min="0" step="1" value="6" required />
+                  </label>
+                  <label>
+                    Product image
+                    <input id="product-image" type="file" accept="image/*" />
+                  </label>
+                  <div class="product-image-preview" id="product-image-preview" hidden>
+                    <img id="product-image-preview-img" alt="Product image preview" />
+                  </div>
+                  <button type="submit" class="button primary full-width">Add Product</button>
+                  <p class="auth-feedback" id="product-form-feedback">Adds the line to the current catalogue and stock list.</p>
+                </form>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Current range</p>
+                  <h4>Products in the catalogue</h4>
+                </div>
+                <div class="product-admin-list" id="product-admin-list"></div>
+              </section>
+            </div>
           </div>
 
           <div class="tab-panel active" id="stock-panel">
@@ -196,8 +265,8 @@
                     Price
                     <input id="label-price" type="text" value="£12.50" />
                   </label>
-                  <button type="submit" class="button primary full-width">Update preview</button>
-                  <button id="print-label" type="button" class="button secondary full-width">Print label</button>
+                  <button type="submit" class="button primary full-width">Update Preview</button>
+                  <button id="print-label" type="button" class="button secondary full-width">Print Label</button>
                 </form>
               </section>
               <section class="panel label-preview-wrap">

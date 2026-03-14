@@ -1060,6 +1060,72 @@ select {
   display: block;
 }
 
+.product-admin-list {
+  display: grid;
+  gap: 14px;
+}
+
+.product-image-preview {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.product-image-preview img {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+.product-admin-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.product-admin-head,
+.product-admin-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.product-admin-head h5,
+.product-admin-meta strong {
+  margin: 0;
+}
+
+.product-admin-meta {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.product-admin-card p {
+  margin: 0;
+}
+
+.product-admin-thumb {
+  width: 96px;
+  min-height: 96px;
+  border-radius: 14px;
+  background-size: cover;
+  background-position: center;
+  color: transparent;
+}
+
+.product-admin-copy {
+  display: grid;
+  gap: 12px;
+}
+
 .label-preview-wrap {
   display: flex;
   flex-direction: column;
@@ -1185,6 +1251,8 @@ select {
   .section-heading,
   .trace-meta,
   .label-price-row,
+  .product-admin-head,
+  .product-admin-meta,
   .brand-strip,
   .site-footer {
     display: grid;
@@ -1219,6 +1287,10 @@ select {
     background: #fff;
   }
 
+  body.printing-label-sheet {
+    background: #fff;
+  }
+
   body.printing-driver-sheet .page-shell > *:not(main),
   body.printing-driver-sheet main > *:not(.operations),
   body.printing-driver-sheet .section-heading,
@@ -1226,6 +1298,17 @@ select {
   body.printing-driver-sheet .tab-panel:not(#deliveries-panel),
   body.printing-driver-sheet .topbar,
   body.printing-driver-sheet .hero {
+    display: none !important;
+  }
+
+  body.printing-label-sheet .page-shell > *:not(main),
+  body.printing-label-sheet main > *:not(.operations),
+  body.printing-label-sheet .section-heading,
+  body.printing-label-sheet .tab-panel:not(#labels-panel),
+  body.printing-label-sheet .topbar,
+  body.printing-label-sheet .hero,
+  body.printing-label-sheet #labels-panel .action-panel,
+  body.printing-label-sheet #labels-panel .panel-head {
     display: none !important;
   }
 
@@ -1241,8 +1324,98 @@ select {
     background: #fff;
   }
 
+  body.printing-label-sheet .page-shell,
+  body.printing-label-sheet .section,
+  body.printing-label-sheet .operations,
+  body.printing-label-sheet #labels-panel,
+  body.printing-label-sheet #labels-panel .panel-grid,
+  body.printing-label-sheet #labels-panel .label-preview-wrap {
+    margin: 0;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: #fff;
+  }
+
   body.printing-driver-sheet #deliveries-panel {
     display: block !important;
+  }
+
+  body.printing-label-sheet #labels-panel {
+    display: block !important;
+  }
+
+  body.printing-label-sheet #labels-panel .panel-grid {
+    display: block;
+  }
+
+  body.printing-label-sheet #labels-panel .label-preview-wrap {
+    display: block;
+  }
+
+  body.printing-label-sheet #label-preview {
+    width: 62mm;
+    min-height: 32mm;
+    margin: 0;
+    padding: 4mm;
+    border: 1px solid #000;
+    border-radius: 0;
+    color: #000;
+    break-inside: avoid;
+  }
+
+  body.printing-label-sheet #label-preview header {
+    font-size: 7pt;
+    letter-spacing: 0.06em;
+  }
+
+  body.printing-label-sheet #label-preview h5 {
+    margin: 3mm 0;
+    font-size: 16pt;
+    line-height: 1.1;
+  }
+
+  body.printing-label-sheet #label-preview dl {
+    gap: 2mm;
+  }
+
+  body.printing-label-sheet #label-preview dl div {
+    width: calc(50% - 1mm);
+    padding: 2mm;
+    border-radius: 0;
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+  }
+
+  body.printing-label-sheet #label-preview dt,
+  body.printing-label-sheet #label-preview dd,
+  body.printing-label-sheet #label-preview .barcode {
+    color: #000;
+  }
+
+  body.printing-label-sheet #label-preview dt {
+    font-size: 7pt;
+  }
+
+  body.printing-label-sheet #label-preview dd {
+    margin-top: 1mm;
+    font-size: 9pt;
+  }
+
+  body.printing-label-sheet #label-preview .label-price-row {
+    margin-top: 3mm;
+    padding-top: 2mm;
+    gap: 2mm;
+  }
+
+  body.printing-label-sheet #preview-price {
+    font-size: 15pt;
+  }
+
+  body.printing-label-sheet #label-preview .barcode {
+    font-size: 8pt;
+    letter-spacing: 0.08em;
   }
 
   body.printing-driver-sheet .driver-print-sheet {

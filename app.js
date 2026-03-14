@@ -126,7 +126,12 @@ const batches = [
   },
 ];
 
+const LOCAL_PRODUCTS_STORAGE_KEY = "braemar.customProducts";
+const LOCAL_PRODUCT_IMAGES_STORAGE_KEY = "braemar.productImages";
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
+
 let products = [...fallbackProducts];
+let liveProductsEnabled = false;
 let deliveryOrders = [
   {
     id: "DEL-001",
@@ -218,6 +223,19 @@ const routeOverview = document.getElementById("route-overview");
 const routeList = document.getElementById("route-list");
 const printDeliverySheetButton = document.getElementById("print-delivery-sheet");
 const driverPrintSheet = document.getElementById("driver-print-sheet");
+const productForm = document.getElementById("product-form");
+const productSkuInput = document.getElementById("product-sku");
+const productNameInput = document.getElementById("product-name");
+const productDescriptionInput = document.getElementById("product-description");
+const productUnitInput = document.getElementById("product-unit");
+const productPriceInput = document.getElementById("product-price");
+const productStockInput = document.getElementById("product-stock");
+const productThresholdInput = document.getElementById("product-threshold");
+const productImageInput = document.getElementById("product-image");
+const productImagePreview = document.getElementById("product-image-preview");
+const productImagePreviewImg = document.getElementById("product-image-preview-img");
+const productFormFeedback = document.getElementById("product-form-feedback");
+const productAdminList = document.getElementById("product-admin-list");
 const shopHeading = document.querySelector("#shop .section-heading h3");
 const heroText = document.querySelector(".retail-section .section-heading .eyebrow");
 const staffAuthForm = document.getElementById("staff-auth-form");
@@ -255,6 +273,143 @@ function buildProductArt(index) {
   return artOptions[index % artOptions.length];
 }
 
+function buildUploadedProductArt(imageUrl) {
+  return `linear-gradient(135deg, rgba(81, 16, 25, 0.24), rgba(81, 16, 25, 0.68)), url("${imageUrl}") center/cover`;
+}
+
+function readStorageJson(key, fallbackValue) {
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) : fallbackValue;
+  } catch (error) {
+    console.error(`Unable to read local storage key ${key}:`, error);
+    return fallbackValue;
+  }
+}
+
+function writeStorageJson(key, value) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Unable to write local storage key ${key}:`, error);
+  }
+}
+
+function loadStoredProducts() {
+  return readStorageJson(LOCAL_PRODUCTS_STORAGE_KEY, []);
+}
+
+function saveStoredProducts(entries) {
+  writeStorageJson(LOCAL_PRODUCTS_STORAGE_KEY, entries);
+}
+
+function loadStoredProductImages() {
+  return readStorageJson(LOCAL_PRODUCT_IMAGES_STORAGE_KEY, {});
+}
+
+function saveStoredProductImages(entries) {
+  writeStorageJson(LOCAL_PRODUCT_IMAGES_STORAGE_KEY, entries);
+}
+
+function upsertStoredProductImage(sku, imageDataUrl) {
+  if (!sku || !imageDataUrl) {
+    return;
+  }
+
+  const images = loadStoredProductImages();
+  images[sku] = imageDataUrl;
+  saveStoredProductImages(images);
+}
+
+function applyStoredProductImages(productList) {
+  const storedImages = loadStoredProductImages();
+
+  return productList.map((product, index) => {
+    const storedImage = storedImages[String(product.sku || "").toUpperCase()];
+    if (!storedImage) {
+      return product;
+    }
+
+    return {
+      ...product,
+      imageDataUrl: storedImage,
+      art: buildUploadedProductArt(storedImage || buildProductArt(index)),
+    };
+  });
+}
+
+function mergeStoredProducts() {
+  const storedProducts = loadStoredProducts();
+  if (!Array.isArray(storedProducts) || !storedProducts.length) {
+    products = applyStoredProductImages(products);
+    return;
+  }
+
+  const existingSkus = new Set(products.map((product) => String(product.sku || "").toUpperCase()));
+  const mergedProducts = [...products];
+  const mergedInventory = [...inventory];
+
+  storedProducts.forEach((storedProduct) => {
+    const normalizedSku = String(storedProduct.sku || "").toUpperCase();
+    if (!normalizedSku || existingSkus.has(normalizedSku)) {
+      return;
+    }
+
+    const productRecord = createProductRecord(storedProduct, mergedProducts.length);
+    mergedProducts.push(productRecord);
+    mergedInventory.push({
+      sku: normalizedSku,
+      product: storedProduct.name,
+      onHand: storedProduct.openingStock,
+      threshold: storedProduct.threshold,
+    });
+    existingSkus.add(normalizedSku);
+  });
+
+  products = applyStoredProductImages(mergedProducts);
+  inventory.length = 0;
+  inventory.push(...mergedInventory);
+}
+
+function persistCustomProduct(product) {
+  const storedProducts = loadStoredProducts();
+  storedProducts.push(product);
+  saveStoredProducts(storedProducts);
+}
+
+function previewProductImage(imageDataUrl) {
+  if (!productImagePreview || !productImagePreviewImg) {
+    return;
+  }
+
+  if (!imageDataUrl) {
+    productImagePreview.hidden = true;
+    productImagePreviewImg.removeAttribute("src");
+    return;
+  }
+
+  productImagePreview.hidden = false;
+  productImagePreviewImg.src = imageDataUrl;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(new Error("Unable to read the selected image file.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function setProductFeedback(message, tone = "muted") {
+  if (!productFormFeedback) {
+    return;
+  }
+
+  productFormFeedback.textContent = message;
+  productFormFeedback.dataset.tone = tone;
+}
+
 function deriveBadge(product, index) {
   if (/venison/i.test(product.name)) {
     return "Seasonal";
@@ -284,8 +439,25 @@ function normalizeSupabaseProducts(rows) {
     price: Number(row.price),
     badge: deriveBadge(row, index),
     stockImpact: 1,
-    art: buildProductArt(index),
+    art: row.imageDataUrl ? buildUploadedProductArt(row.imageDataUrl) : buildProductArt(index),
+    imageDataUrl: row.imageDataUrl || "",
+    unit: row.unit || "item",
   }));
+}
+
+function createProductRecord(product, index = products.length) {
+  return {
+    id: slugifyProductName(product.sku || product.name || `product-${index + 1}`),
+    sku: product.sku,
+    name: product.name,
+    description: product.description || "Prepared fresh for local collection or delivery.",
+    price: Number(product.price),
+    badge: deriveBadge(product, index),
+    stockImpact: 1,
+    art: product.imageDataUrl ? buildUploadedProductArt(product.imageDataUrl) : buildProductArt(index),
+    imageDataUrl: product.imageDataUrl || "",
+    unit: product.unit || "item",
+  };
 }
 
 function syncInventoryWithProducts() {
@@ -617,7 +789,7 @@ async function fetchLiveProducts() {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase
     .from("products")
-    .select("sku, name, description, price")
+    .select("sku, name, description, price, unit")
     .eq("is_active", true)
     .order("name");
 
@@ -627,8 +799,31 @@ async function fetchLiveProducts() {
 
   if (Array.isArray(data) && data.length) {
     products = normalizeSupabaseProducts(data);
+    liveProductsEnabled = true;
     syncInventoryWithProducts();
   }
+}
+
+async function saveProductToSupabase(product) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("products")
+    .insert({
+      sku: product.sku,
+      name: product.name,
+      description: product.description,
+      unit: product.unit,
+      price: product.price,
+      is_active: true,
+    })
+    .select("sku, name, description, price, unit")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 async function fetchLiveDeliveries() {
@@ -811,6 +1006,43 @@ function renderInventory() {
 
   stockProduct.innerHTML = inventory
     .map((item) => `<option value="${item.product}">${item.product}</option>`)
+    .join("");
+}
+
+function renderProductAdminList() {
+  if (!productAdminList) {
+    return;
+  }
+
+  if (!products.length) {
+    productAdminList.innerHTML = `<div class="empty-state">No products are available yet.</div>`;
+    return;
+  }
+
+  productAdminList.innerHTML = products
+    .map((product) => {
+      const inventoryItem = inventory.find((item) => item.product === product.name);
+      return `
+        <article class="product-admin-card">
+          <div class="product-admin-thumb" style="background:${product.art}">${product.name}</div>
+          <div class="product-admin-copy">
+            <div class="product-admin-head">
+              <div>
+                <p class="eyebrow">SKU ${product.sku || "Not set"}</p>
+                <h5>${product.name}</h5>
+              </div>
+              <strong>${formatCurrency(product.price)}</strong>
+            </div>
+            <p>${product.description}</p>
+            <div class="product-admin-meta">
+              <span>Unit: ${product.unit || "item"}</span>
+              <span>Stock: ${inventoryItem?.onHand ?? 0}</span>
+              <span>Threshold: ${inventoryItem?.threshold ?? 0}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    })
     .join("");
 }
 
@@ -1094,6 +1326,7 @@ function renderStorefront() {
   renderFeaturedProducts();
   renderBasket();
   renderInventory();
+  renderProductAdminList();
   renderStockActivity();
   renderBatches();
 }
@@ -1169,6 +1402,151 @@ if (stockForm) {
   });
 }
 
+if (productForm) {
+  productForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const selectedImage = productImageInput?.files?.[0];
+
+    const payload = {
+      sku: productSkuInput.value.trim().toUpperCase(),
+      name: productNameInput.value.trim(),
+      description: productDescriptionInput.value.trim(),
+      unit: productUnitInput.value,
+      price: Number(productPriceInput.value),
+      openingStock: Number(productStockInput.value),
+      threshold: Number(productThresholdInput.value),
+    };
+
+    if (!payload.sku || !payload.name || Number.isNaN(payload.price) || payload.price < 0) {
+      setProductFeedback("Enter a SKU, product name, and valid price.", "danger");
+      return;
+    }
+
+    if (
+      Number.isNaN(payload.openingStock) ||
+      payload.openingStock < 0 ||
+      Number.isNaN(payload.threshold) ||
+      payload.threshold < 0
+    ) {
+      setProductFeedback("Opening stock and threshold must be zero or more.", "danger");
+      return;
+    }
+
+    const skuExists = products.some((product) => String(product.sku || "").toUpperCase() === payload.sku);
+    if (skuExists) {
+      setProductFeedback("That SKU already exists. Use a different code.", "danger");
+      return;
+    }
+
+    if (selectedImage && selectedImage.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+      setProductFeedback("Choose an image smaller than 2 MB.", "danger");
+      return;
+    }
+
+    setProductFeedback(liveProductsEnabled ? "Saving product to Supabase." : "Adding product to the local catalogue.", "muted");
+
+    try {
+      const imageDataUrl = selectedImage ? await readFileAsDataUrl(selectedImage) : "";
+      const sourceProduct = liveProductsEnabled
+        ? await saveProductToSupabase(payload)
+        : {
+            sku: payload.sku,
+            name: payload.name,
+            description: payload.description,
+            unit: payload.unit,
+            price: payload.price,
+          };
+
+      const newProduct = createProductRecord({ ...sourceProduct, imageDataUrl });
+      products = [...products, newProduct];
+      inventory.push({
+        sku: payload.sku,
+        product: payload.name,
+        onHand: payload.openingStock,
+        threshold: payload.threshold,
+      });
+
+      if (imageDataUrl) {
+        upsertStoredProductImage(payload.sku, imageDataUrl);
+      }
+
+      if (!liveProductsEnabled) {
+        persistCustomProduct({
+          sku: payload.sku,
+          name: payload.name,
+          description: payload.description,
+          unit: payload.unit,
+          price: payload.price,
+          openingStock: payload.openingStock,
+          threshold: payload.threshold,
+        });
+      }
+
+      stockActivity.unshift({
+        time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+        message: `${payload.name}: new product added with ${payload.openingStock} units on hand.`,
+      });
+
+      renderStorefront();
+
+      if (labelForm) {
+        document.getElementById("label-product").value = payload.name;
+      }
+
+      productForm.reset();
+      productSkuInput.value = "";
+      productNameInput.value = "";
+      productDescriptionInput.value = "";
+      productUnitInput.value = "item";
+      productPriceInput.value = "";
+      productStockInput.value = "0";
+      productThresholdInput.value = "0";
+      if (productImageInput) {
+        productImageInput.value = "";
+      }
+      previewProductImage("");
+
+      setProductFeedback(
+        liveProductsEnabled
+          ? `${payload.name} was added and saved to the live product catalogue.`
+          : `${payload.name} was added locally and will stay available in this browser.`,
+        "success",
+      );
+    } catch (error) {
+      setProductFeedback(error.message || "Unable to add the product.", "danger");
+    }
+  });
+}
+
+if (productImageInput) {
+  productImageInput.addEventListener("change", async () => {
+    const selectedImage = productImageInput.files?.[0];
+
+    if (!selectedImage) {
+      previewProductImage("");
+      return;
+    }
+
+    if (selectedImage.size > MAX_PRODUCT_IMAGE_SIZE_BYTES) {
+      productImageInput.value = "";
+      previewProductImage("");
+      setProductFeedback("Choose an image smaller than 2 MB.", "danger");
+      return;
+    }
+
+    try {
+      const imageDataUrl = await readFileAsDataUrl(selectedImage);
+      previewProductImage(imageDataUrl);
+      setProductFeedback("Image ready. Add the product to save it.", "muted");
+    } catch (error) {
+      productImageInput.value = "";
+      previewProductImage("");
+      setProductFeedback(error.message || "Unable to preview the selected image.", "danger");
+    }
+  });
+}
+
 if (deliveryDateInput) {
   const preferredDate =
     formatDateForInput(
@@ -1190,6 +1568,7 @@ if (printDeliverySheetButton) {
 
 window.addEventListener("afterprint", () => {
   document.body.classList.remove("printing-driver-sheet");
+  document.body.classList.remove("printing-label-sheet");
 });
 
 const labelForm = document.getElementById("label-form");
@@ -1211,6 +1590,7 @@ if (labelForm) {
 const printButton = document.getElementById("print-label");
 if (printButton) {
   printButton.addEventListener("click", () => {
+    document.body.classList.add("printing-label-sheet");
     window.print();
   });
 }
@@ -1257,11 +1637,13 @@ if (signOutButton) {
 }
 
 async function bootstrapPage() {
+  mergeStoredProducts();
   renderStorefront();
   showLiveDataState(false);
 
   try {
     await fetchLiveProducts();
+    mergeStoredProducts();
     renderStorefront();
     showLiveDataState(true);
   } catch (error) {
@@ -1318,6 +1700,10 @@ bootstrapPage();
 
 if (window.location.hash === "#traceability") {
   setActiveTab("traceability");
+}
+
+if (window.location.hash === "#products") {
+  setActiveTab("products");
 }
 
 if (window.location.hash === "#labels") {
