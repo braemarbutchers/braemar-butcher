@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/staff",
+      "destination": "/staff-login",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/",
@@ -15,7 +22,7 @@
       "destination": "/visit.html"
     },
     {
-      "source": "/staff",
+      "source": "/staff-login",
       "destination": "/staff-login.html"
     },
     {
