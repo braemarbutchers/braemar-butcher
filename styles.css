@@ -51,7 +51,7 @@ body {
 
 .topbar {
   display: grid;
-  justify-items: center;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 18px;
   padding: 22px 28px;
@@ -67,6 +67,7 @@ body {
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  grid-column: 2;
 }
 
 .brand-copy {
@@ -96,7 +97,9 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
-  justify-content: center;
+  justify-content: flex-end;
+  grid-column: 3;
+  justify-self: end;
 }
 
 .topnav a,
@@ -1475,6 +1478,16 @@ select {
   .brand-strip,
   .site-footer {
     display: grid;
+  }
+
+  .topnav {
+    justify-content: center;
+    justify-self: center;
+    grid-column: auto;
+  }
+
+  .brand-lockup {
+    grid-column: auto;
   }
 
   .site-logo {
