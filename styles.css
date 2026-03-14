@@ -1205,6 +1205,8 @@ select {
   align-items: stretch;
   height: 72px;
   width: 100%;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 
 .barcode-bar,
@@ -1217,6 +1219,9 @@ select {
 
 .barcode-bar {
   background: #000;
+  box-shadow: inset 0 0 0 1000px #000;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 
 .barcode-space,
@@ -1492,6 +1497,8 @@ select {
   body.printing-label-sheet #label-preview .barcode-svg img,
   body.printing-label-sheet #label-preview .barcode-svg svg {
     height: 5.5mm;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   body.printing-label-sheet #label-preview .barcode-value {
