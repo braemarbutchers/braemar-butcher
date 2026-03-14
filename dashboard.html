@@ -62,6 +62,7 @@
               <button class="tab" data-tab="deliveries" role="tab" aria-selected="false">Deliveries</button>
               <button class="tab" data-tab="products" role="tab" aria-selected="false">Products</button>
               <button class="tab active" data-tab="stock" role="tab" aria-selected="true">Stock</button>
+              <button class="tab" data-tab="intake" role="tab" aria-selected="false">Intake</button>
               <button class="tab" data-tab="traceability" role="tab" aria-selected="false">Tracing</button>
               <button class="tab" data-tab="labels" role="tab" aria-selected="false">Labels</button>
             </div>
@@ -218,20 +219,143 @@
             </div>
           </div>
 
+          <div class="tab-panel" id="intake-panel">
+            <div class="panel-grid trace-grid">
+              <section class="panel action-panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Goods in</p>
+                  <h4>Receive a meat intake lot</h4>
+                </div>
+                <form id="intake-form">
+                  <label>
+                    Intake code
+                    <input id="intake-code" type="text" value="INT-260313-BEEF-01" required />
+                  </label>
+                  <label>
+                    Supplier
+                    <input id="intake-supplier" type="text" value="Braeside Lamb" required />
+                  </label>
+                  <label>
+                    Source type
+                    <select id="intake-source-type">
+                      <option value="boxed_meat">Boxed meat</option>
+                      <option value="carcass">Carcass</option>
+                      <option value="primal">Primal</option>
+                      <option value="animal">Animal</option>
+                      <option value="game">Game</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label>
+                    Species
+                    <input id="intake-species" type="text" value="Lamb" required />
+                  </label>
+                  <label>
+                    Cut or description
+                    <input id="intake-cut" type="text" value="Loin primal" />
+                  </label>
+                  <label>
+                    Supplier lot code
+                    <input id="intake-supplier-lot" type="text" value="BRS-LM-4421" />
+                  </label>
+                  <label>
+                    Animal or source ID
+                    <input id="intake-animal-id" type="text" value="UK7720 900122" />
+                  </label>
+                  <label>
+                    Weight (kg)
+                    <input id="intake-weight" type="number" min="0" step="0.01" value="24.5" />
+                  </label>
+                  <label>
+                    Received on
+                    <input id="intake-received" type="date" value="2026-03-13" required />
+                  </label>
+                  <label>
+                    Use by
+                    <input id="intake-useby" type="date" value="2026-03-19" />
+                  </label>
+                  <label>
+                    Intake note
+                    <input id="intake-note" type="text" value="Movement docs checked on intake." />
+                  </label>
+                  <button type="submit" class="button primary full-width">Receive Intake Lot</button>
+                  <p class="auth-feedback" id="intake-feedback">Creates an intake record and a raw traceable batch.</p>
+                </form>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Raw stock</p>
+                  <h4>Inbound lot register</h4>
+                </div>
+                <div class="batch-list" id="intake-list"></div>
+              </section>
+            </div>
+          </div>
+
           <div class="tab-panel" id="traceability-panel">
             <div class="panel-grid trace-grid">
               <section class="panel">
                 <div class="panel-head">
-                  <p class="eyebrow">Meat tracing</p>
-                  <h4>Batch register</h4>
+                  <p class="eyebrow">Production link</p>
+                  <h4>Create a finished product batch</h4>
                 </div>
-                <div class="batch-list" id="batch-list"></div>
+                <form id="finished-batch-form">
+                  <label>
+                    Product
+                    <select id="finished-product"></select>
+                  </label>
+                  <label>
+                    Source intake lot
+                    <select id="finished-source-lot"></select>
+                  </label>
+                  <label>
+                    Finished batch code
+                    <input id="finished-batch-code" type="text" value="DB-260313-PIE" required />
+                  </label>
+                  <label>
+                    Quantity packed
+                    <input id="finished-quantity" type="number" min="0" step="1" value="28" required />
+                  </label>
+                  <label>
+                    Unit
+                    <select id="finished-unit">
+                      <option value="item">Item</option>
+                      <option value="pack" selected>Pack</option>
+                      <option value="tray">Tray</option>
+                      <option value="box">Box</option>
+                      <option value="kg">Kg</option>
+                    </select>
+                  </label>
+                  <label>
+                    Weight or yield
+                    <input id="finished-weight" type="text" value="28 pies" />
+                  </label>
+                  <label>
+                    Packed on
+                    <input id="finished-packed-on" type="date" value="2026-03-13" required />
+                  </label>
+                  <label>
+                    Use by
+                    <input id="finished-useby" type="date" value="2026-03-20" />
+                  </label>
+                  <label>
+                    Till code
+                    <input id="finished-barcode" type="text" value="DB-PIE-01" />
+                  </label>
+                  <label>
+                    Production note
+                    <input id="finished-note" type="text" value="Pie filling cooked and packed into chilled finished goods." />
+                  </label>
+                  <button type="submit" class="button primary full-width">Create Finished Batch</button>
+                  <p class="auth-feedback" id="finished-batch-feedback">Links one intake lot to a sellable finished batch.</p>
+                </form>
               </section>
               <section class="panel">
                 <div class="panel-head">
                   <p class="eyebrow">Chain of custody</p>
-                  <h4 id="trace-title">Select a batch</h4>
+                  <h4 id="trace-title">Select a finished batch</h4>
                 </div>
+                <div class="batch-list" id="batch-list"></div>
                 <div class="trace-meta" id="trace-meta"></div>
                 <ol class="timeline" id="trace-timeline"></ol>
               </section>
@@ -246,6 +370,10 @@
                   <h4>Generate a retail-ready label</h4>
                 </div>
                 <form id="label-form">
+                  <label>
+                    Finished batch
+                    <select id="label-source-batch"></select>
+                  </label>
                   <label>
                     Product name
                     <input id="label-product" type="text" value="Family Steak Pie" />

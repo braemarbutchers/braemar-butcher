@@ -548,6 +548,22 @@ function saveStoredProductImages(entries) {
   writeStorageJson(LOCAL_PRODUCT_IMAGES_STORAGE_KEY, entries);
 }
 
+function loadStoredInboundLots() {
+  return readStorageJson(LOCAL_INBOUND_LOTS_STORAGE_KEY, []);
+}
+
+function saveStoredInboundLots(entries) {
+  writeStorageJson(LOCAL_INBOUND_LOTS_STORAGE_KEY, entries);
+}
+
+function loadStoredFinishedBatches() {
+  return readStorageJson(LOCAL_FINISHED_BATCHES_STORAGE_KEY, []);
+}
+
+function saveStoredFinishedBatches(entries) {
+  writeStorageJson(LOCAL_FINISHED_BATCHES_STORAGE_KEY, entries);
+}
+
 function upsertStoredProductImage(sku, imageDataUrl) {
   if (!sku || !imageDataUrl) {
     return;
@@ -638,6 +654,36 @@ function mergeStoredProducts() {
   products = applyStoredProductImages(mergedProducts);
   inventory.length = 0;
   inventory.push(...mergedInventory);
+}
+
+function mergeStoredTraceability() {
+  const storedInboundLots = loadStoredInboundLots();
+  if (Array.isArray(storedInboundLots) && storedInboundLots.length) {
+    const mergedInboundLots = [...inboundLots];
+    storedInboundLots.forEach((entry) => {
+      const existingIndex = mergedInboundLots.findIndex((lot) => lot.id === entry.id || lot.intakeCode === entry.intakeCode);
+      if (existingIndex >= 0) {
+        mergedInboundLots[existingIndex] = { ...mergedInboundLots[existingIndex], ...entry };
+      } else {
+        mergedInboundLots.unshift(entry);
+      }
+    });
+    inboundLots = mergedInboundLots;
+  }
+
+  const storedFinishedBatches = loadStoredFinishedBatches();
+  if (Array.isArray(storedFinishedBatches) && storedFinishedBatches.length) {
+    const mergedFinishedBatches = [...finishedBatches];
+    storedFinishedBatches.forEach((entry) => {
+      const existingIndex = mergedFinishedBatches.findIndex((batch) => batch.id === entry.id);
+      if (existingIndex >= 0) {
+        mergedFinishedBatches[existingIndex] = { ...mergedFinishedBatches[existingIndex], ...entry };
+      } else {
+        mergedFinishedBatches.unshift(entry);
+      }
+    });
+    finishedBatches = mergedFinishedBatches;
+  }
 }
 
 function persistCustomProduct(product) {
@@ -870,6 +916,69 @@ function formatDateForInput(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function formatDateForDisplay(value) {
+  if (!value) {
+    return "Not set";
+  }
+
+  const date = new Date(`${formatDateForInput(value)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+function formatBatchTime(value) {
+  if (!value) {
+    return new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function findProductByName(productName) {
+  return products.find(
+    (product) => String(product.name || "").trim().toLowerCase() === String(productName || "").trim().toLowerCase(),
+  );
+}
+
+function getInboundLotById(lotId) {
+  return inboundLots.find((lot) => lot.id === lotId);
+}
+
+function getFinishedBatchById(batchId) {
+  return finishedBatches.find((batch) => batch.id === batchId);
+}
+
+function persistTraceabilityState() {
+  saveStoredInboundLots(inboundLots);
+  saveStoredFinishedBatches(finishedBatches);
+}
+
+function setIntakeFeedback(message, tone = "muted") {
+  if (!intakeFeedback) {
+    return;
+  }
+
+  intakeFeedback.textContent = message;
+  intakeFeedback.dataset.tone = tone;
+}
+
+function setFinishedBatchFeedback(message, tone = "muted") {
+  if (!finishedBatchFeedback) {
+    return;
+  }
+
+  finishedBatchFeedback.textContent = message;
+  finishedBatchFeedback.dataset.tone = tone;
 }
 
 function formatDeliveryWindow(value) {
@@ -1270,6 +1379,228 @@ async function updateProductInSupabase(originalSku, product) {
   return data;
 }
 
+async function fetchLiveTraceability() {
+  const supabase = await getSupabaseClient();
+  const [{ data: lots, error: lotsError }, { data: batchesData, error: batchesError }] = await Promise.all([
+    supabase
+      .from("inbound_lots")
+      .select("id, intake_code, source_type, species, cut_description, supplier_lot_code, received_at, use_by_date, received_weight_kg, status, notes, source_animals(animal_identifier), suppliers(name), stock_batches(batch_code)")
+      .order("received_at", { ascending: false }),
+    supabase
+      .from("product_batches")
+      .select(`
+        id,
+        retail_barcode,
+        packed_quantity,
+        packed_unit,
+        label_snapshot,
+        products(name, sku),
+        stock_batches (
+          batch_code,
+          packed_on,
+          use_by_date,
+          quantity,
+          status,
+          source_inbound_lot_id
+        )
+      `)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (lotsError) {
+    throw lotsError;
+  }
+
+  if (batchesError) {
+    throw batchesError;
+  }
+
+  if (Array.isArray(lots) && lots.length) {
+    inboundLots = lots.map((lot) => ({
+      id: lot.id,
+      intakeCode: lot.intake_code,
+      supplier: lot.suppliers?.name || "Unknown supplier",
+      sourceType: lot.source_type,
+      species: lot.species,
+      cutDescription: lot.cut_description || "",
+      supplierLotCode: lot.supplier_lot_code || "",
+      animalId: lot.source_animals?.[0]?.animal_identifier || "",
+      receivedAt: formatDateForInput(lot.received_at),
+      useBy: formatDateForInput(lot.use_by_date),
+      weightKg: Number(lot.received_weight_kg || 0),
+      note: lot.notes || "",
+      rawBatchCode: lot.stock_batches?.[0]?.batch_code || "",
+      status: titleCaseStatus(lot.status),
+    }));
+  }
+
+  if (Array.isArray(batchesData) && batchesData.length) {
+    finishedBatches = batchesData.map((row) => {
+      const stockBatch = row.stock_batches || {};
+      const snapshot = row.label_snapshot || {};
+      const productName = row.products?.name || snapshot.product || "Unassigned product";
+      const sourceLot = inboundLots.find((lot) => lot.id === stockBatch.source_inbound_lot_id);
+      return {
+        id: stockBatch.batch_code || row.id,
+        product: productName,
+        productSku: row.products?.sku || snapshot.barcode || "",
+        sourceLotId: stockBatch.source_inbound_lot_id || "",
+        sourceIntakeCode: sourceLot?.intakeCode || "",
+        sourceBatchCode: stockBatch.batch_code || "",
+        origin: snapshot.origin || sourceLot?.supplier || "Live production",
+        animalId: snapshot.animalId || sourceLot?.animalId || "",
+        packedOn: formatDateForInput(stockBatch.packed_on),
+        useBy: formatDateForInput(stockBatch.use_by_date),
+        quantity: Number(row.packed_quantity || stockBatch.quantity || 0),
+        unit: row.packed_unit || "item",
+        yield: snapshot.weight || `${row.packed_quantity || stockBatch.quantity || 0} ${row.packed_unit || "item"}`,
+        weight: snapshot.weight || `${row.packed_quantity || stockBatch.quantity || 0} ${row.packed_unit || "item"}`,
+        status: titleCaseStatus(stockBatch.status),
+        barcodeValue: normalizeBarcodeValue(row.retail_barcode, row.products?.sku || ""),
+        note: snapshot.note || "",
+        timeline: [
+          {
+            label: "Packed",
+            detail: snapshot.note || "Finished batch loaded from live traceability records.",
+            time: formatBatchTime(stockBatch.packed_on),
+          },
+        ],
+      };
+    });
+  }
+
+  traceabilityLiveEnabled = true;
+}
+
+async function saveInboundLotToSupabase(entry) {
+  const supabase = await getSupabaseClient();
+  const supplierName = String(entry.supplier || "").trim();
+
+  let supplierId = null;
+  const { data: existingSupplier } = await supabase
+    .from("suppliers")
+    .select("id")
+    .eq("name", supplierName)
+    .maybeSingle();
+
+  supplierId = existingSupplier?.id || null;
+
+  if (!supplierId) {
+    const { data: supplierRow, error: supplierError } = await supabase
+      .from("suppliers")
+      .insert({ name: supplierName })
+      .select("id")
+      .single();
+
+    if (supplierError) {
+      throw supplierError;
+    }
+
+    supplierId = supplierRow.id;
+  }
+
+  const { data: lotRow, error: lotError } = await supabase
+    .from("inbound_lots")
+    .insert({
+      supplier_id: supplierId,
+      intake_code: entry.intakeCode,
+      source_type: entry.sourceType,
+      species: entry.species,
+      cut_description: entry.cutDescription,
+      supplier_lot_code: entry.supplierLotCode,
+      received_at: entry.receivedAt,
+      use_by_date: entry.useBy || null,
+      received_weight_kg: entry.weightKg,
+      status: String(entry.status || "available").toLowerCase(),
+      notes: entry.note,
+    })
+    .select("id")
+    .single();
+
+  if (lotError) {
+    throw lotError;
+  }
+
+  if (entry.animalId) {
+    await supabase.from("source_animals").insert({
+      inbound_lot_id: lotRow.id,
+      animal_identifier: entry.animalId,
+    });
+  }
+
+  await supabase.from("stock_batches").insert({
+    batch_code: entry.rawBatchCode,
+    batch_type: "raw",
+    source_inbound_lot_id: lotRow.id,
+    location_code: "CHILL",
+    quantity: entry.weightKg,
+    unit: "kg",
+    status: "available",
+  });
+}
+
+async function saveFinishedBatchToSupabase(entry) {
+  const supabase = await getSupabaseClient();
+  const product = findProductByName(entry.product);
+  const sourceLot = getInboundLotById(entry.sourceLotId);
+  if (!product || !sourceLot) {
+    throw new Error("A product and source intake lot are required before saving the finished batch.");
+  }
+
+  const { data: lotRow, error: lotError } = await supabase
+    .from("inbound_lots")
+    .select("id")
+    .eq("intake_code", sourceLot.intakeCode)
+    .maybeSingle();
+
+  if (lotError) {
+    throw lotError;
+  }
+
+  const { data: stockBatchRow, error: stockBatchError } = await supabase
+    .from("stock_batches")
+    .insert({
+      batch_code: entry.id,
+      batch_type: "finished",
+      source_inbound_lot_id: lotRow?.id || null,
+      product_id: product.id,
+      location_code: "FINISHED_GOODS",
+      quantity: entry.quantity,
+      unit: entry.unit,
+      status: "available",
+      packed_on: entry.packedOn,
+      use_by_date: entry.useBy || null,
+    })
+    .select("id")
+    .single();
+
+  if (stockBatchError) {
+    throw stockBatchError;
+  }
+
+  const { error: productBatchError } = await supabase.from("product_batches").insert({
+    product_id: product.id,
+    stock_batch_id: stockBatchRow.id,
+    retail_barcode: entry.barcodeValue,
+    packed_quantity: entry.quantity,
+    packed_unit: entry.unit,
+    label_snapshot: {
+      product: entry.product,
+      packedOn: entry.packedOn,
+      useBy: entry.useBy,
+      weight: entry.weight,
+      note: entry.note,
+      animalId: entry.animalId,
+      origin: entry.origin,
+      barcode: entry.barcodeValue,
+    },
+  });
+
+  if (productBatchError) {
+    throw productBatchError;
+  }
+}
+
 async function fetchLiveDeliveries() {
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase
@@ -1322,6 +1653,97 @@ function setActiveTab(tabName) {
 
   document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
   document.getElementById(`${tabName}-panel`).classList.add("active");
+}
+
+function populateFinishedBatchProductOptions() {
+  if (!finishedProductInput) {
+    return;
+  }
+
+  finishedProductInput.innerHTML = products
+    .map((product) => `<option value="${product.name}">${product.name}</option>`)
+    .join("");
+}
+
+function populateSourceLotOptions() {
+  if (!finishedSourceLotInput) {
+    return;
+  }
+
+  finishedSourceLotInput.innerHTML = inboundLots
+    .map(
+      (lot) =>
+        `<option value="${lot.id}">${lot.intakeCode} · ${lot.supplier} · ${lot.species}${lot.cutDescription ? ` · ${lot.cutDescription}` : ""}</option>`,
+    )
+    .join("");
+}
+
+function populateLabelBatchOptions() {
+  if (!labelSourceBatchInput) {
+    return;
+  }
+
+  labelSourceBatchInput.innerHTML = finishedBatches
+    .map((batch) => `<option value="${batch.id}">${batch.id} · ${batch.product}</option>`)
+    .join("");
+}
+
+function syncLabelFormToBatch(batchId) {
+  const batch = getFinishedBatchById(batchId) || finishedBatches[0];
+  if (!batch) {
+    return;
+  }
+
+  const product = findProductByName(batch.product);
+  const labelProduct = document.getElementById("label-product");
+  const labelBatch = document.getElementById("label-batch");
+  const labelPacked = document.getElementById("label-packed");
+  const labelUseBy = document.getElementById("label-useby");
+  const labelWeight = document.getElementById("label-weight");
+  const labelPrice = document.getElementById("label-price");
+
+  if (labelSourceBatchInput) {
+    labelSourceBatchInput.value = batch.id;
+  }
+  if (labelProduct) {
+    labelProduct.value = batch.product;
+  }
+  if (labelBatch) {
+    labelBatch.value = batch.id;
+  }
+  if (labelPacked) {
+    labelPacked.value = formatDateForInput(batch.packedOn);
+  }
+  if (labelUseBy) {
+    labelUseBy.value = formatDateForInput(batch.useBy);
+  }
+  if (labelWeight) {
+    labelWeight.value = batch.weight || batch.yield || `${batch.quantity} ${batch.unit}`;
+  }
+  if (labelPrice) {
+    labelPrice.value = product ? formatCurrency(product.price) : "";
+  }
+  if (labelBarcodeInput) {
+    labelBarcodeInput.value = normalizeBarcodeValue(batch.barcodeValue, batch.productSku || product?.sku || "");
+  }
+}
+
+function hydrateTraceabilityForms() {
+  populateFinishedBatchProductOptions();
+  populateSourceLotOptions();
+  populateLabelBatchOptions();
+
+  if (finishedProductInput && products.length && !finishedProductInput.value) {
+    finishedProductInput.value = products[0].name;
+  }
+
+  if (finishedSourceLotInput && inboundLots.length && !finishedSourceLotInput.value) {
+    finishedSourceLotInput.value = inboundLots[0].id;
+  }
+
+  if (labelSourceBatchInput && finishedBatches.length) {
+    syncLabelFormToBatch(labelSourceBatchInput.value || finishedBatches[0].id);
+  }
 }
 
 function formatCurrency(value) {
@@ -1501,6 +1923,35 @@ function renderStockActivity() {
 
   stockActivityLog.innerHTML = stockActivity
     .map((entry) => `<div><strong>${entry.time}</strong><br />${entry.message}</div>`)
+    .join("");
+}
+
+function renderInboundLots() {
+  if (!intakeList) {
+    return;
+  }
+
+  if (!inboundLots.length) {
+    intakeList.innerHTML = '<div class="empty-state">No intake lots have been received yet.</div>';
+    return;
+  }
+
+  intakeList.innerHTML = inboundLots
+    .map(
+      (lot) => `
+        <article class="batch-card">
+          <div class="batch-header">
+            <h5>${lot.intakeCode}</h5>
+            <span class="pill">${lot.status}</span>
+          </div>
+          <p><strong>${lot.supplier}</strong></p>
+          <p>${lot.species}${lot.cutDescription ? ` · ${lot.cutDescription}` : ""}</p>
+          <p>Raw batch: ${lot.rawBatchCode}</p>
+          <p>Weight: ${lot.weightKg} kg</p>
+          <p>Use by: ${formatDateForDisplay(lot.useBy)}</p>
+        </article>
+      `,
+    )
     .join("");
 }
 
@@ -1696,12 +2147,26 @@ function renderDeliveries() {
   `;
 }
 
-function renderBatches(activeBatchId = batches[0].id) {
+function renderBatches(activeBatchId = finishedBatches[0]?.id) {
   if (!batchList) {
     return;
   }
 
-  batchList.innerHTML = batches
+  if (!finishedBatches.length) {
+    batchList.innerHTML = '<div class="empty-state">No finished batches have been created yet.</div>';
+    if (traceTitle) {
+      traceTitle.textContent = "Create a finished batch";
+    }
+    if (traceMeta) {
+      traceMeta.innerHTML = "";
+    }
+    if (traceTimeline) {
+      traceTimeline.innerHTML = "";
+    }
+    return;
+  }
+
+  batchList.innerHTML = finishedBatches
     .map(
       (batch) => `
         <article class="batch-card ${batch.id === activeBatchId ? "active" : ""}" data-batch="${batch.id}">
@@ -1710,7 +2175,7 @@ function renderBatches(activeBatchId = batches[0].id) {
             <span class="pill">${batch.status}</span>
           </div>
           <p><strong>${batch.id}</strong></p>
-          <p>Origin: ${batch.origin}</p>
+          <p>Source: ${batch.sourceIntakeCode}</p>
           <p>Yield: ${batch.yield}</p>
         </article>
       `,
@@ -1725,15 +2190,17 @@ function renderTraceDetails(batchId) {
     return;
   }
 
-  const batch = batches.find((entry) => entry.id === batchId);
+  const batch = finishedBatches.find((entry) => entry.id === batchId);
   if (!batch) {
     return;
   }
 
+  const sourceLot = getInboundLotById(batch.sourceLotId);
   traceTitle.textContent = `${batch.product} · ${batch.id}`;
   traceMeta.innerHTML = `
-    <div><strong>Origin</strong><br />${batch.origin}</div>
-    <div><strong>Animal ID</strong><br />${batch.animalId}</div>
+    <div><strong>Supplier</strong><br />${sourceLot?.supplier || batch.origin}</div>
+    <div><strong>Intake</strong><br />${batch.sourceIntakeCode || sourceLot?.intakeCode || "Not linked"}</div>
+    <div><strong>Animal ID</strong><br />${batch.animalId || sourceLot?.animalId || "Not recorded"}</div>
     <div><strong>Yield</strong><br />${batch.yield}</div>
   `;
   traceTimeline.innerHTML = batch.timeline
@@ -1782,6 +2249,8 @@ function renderStorefront() {
   renderInventory();
   renderProductAdminList();
   renderStockActivity();
+  renderInboundLots();
+  hydrateTraceabilityForms();
   renderBatches();
 }
 
@@ -1858,6 +2327,148 @@ if (stockForm) {
 
     renderInventory();
     renderStockActivity();
+  });
+}
+
+if (intakeForm) {
+  intakeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      id: slugifyProductName(document.getElementById("intake-code").value.trim() || `intake-${Date.now()}`),
+      intakeCode: document.getElementById("intake-code").value.trim().toUpperCase(),
+      supplier: document.getElementById("intake-supplier").value.trim(),
+      sourceType: document.getElementById("intake-source-type").value,
+      species: document.getElementById("intake-species").value.trim(),
+      cutDescription: document.getElementById("intake-cut").value.trim(),
+      supplierLotCode: document.getElementById("intake-supplier-lot").value.trim(),
+      animalId: document.getElementById("intake-animal-id").value.trim(),
+      receivedAt: document.getElementById("intake-received").value,
+      useBy: document.getElementById("intake-useby").value,
+      weightKg: Number(document.getElementById("intake-weight").value),
+      note: document.getElementById("intake-note").value.trim(),
+      rawBatchCode: `RAW-${document.getElementById("intake-code").value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "-")}`,
+      status: "Available",
+    };
+
+    if (!payload.intakeCode || !payload.supplier || !payload.species || !payload.receivedAt || Number.isNaN(payload.weightKg)) {
+      setIntakeFeedback("Enter the intake code, supplier, species, received date, and weight.", "danger");
+      return;
+    }
+
+    if (inboundLots.some((lot) => lot.intakeCode === payload.intakeCode)) {
+      setIntakeFeedback("That intake code already exists.", "danger");
+      return;
+    }
+
+    setIntakeFeedback(traceabilityLiveEnabled ? "Saving intake lot to Supabase." : "Saving intake lot locally.", "muted");
+
+    try {
+      if (traceabilityLiveEnabled) {
+        await saveInboundLotToSupabase(payload);
+      }
+
+      inboundLots = [payload, ...inboundLots];
+      persistTraceabilityState();
+      renderStorefront();
+      stockActivity.unshift({
+        time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+        message: `${payload.intakeCode}: ${payload.weightKg} kg received from ${payload.supplier}.`,
+      });
+      renderStockActivity();
+      intakeForm.reset();
+      document.getElementById("intake-source-type").value = "boxed_meat";
+      setIntakeFeedback(`Intake ${payload.intakeCode} received and raw batch ${payload.rawBatchCode} created.`, "success");
+    } catch (error) {
+      setIntakeFeedback(error.message || "Unable to save the intake lot.", "danger");
+    }
+  });
+}
+
+if (finishedBatchForm) {
+  finishedBatchForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const productName = finishedProductInput?.value || "";
+    const sourceLotId = finishedSourceLotInput?.value || "";
+    const sourceLot = getInboundLotById(sourceLotId);
+    const product = findProductByName(productName);
+    const payload = {
+      id: document.getElementById("finished-batch-code").value.trim().toUpperCase(),
+      product: productName,
+      productSku: product?.sku || "",
+      sourceLotId,
+      sourceIntakeCode: sourceLot?.intakeCode || "",
+      sourceBatchCode: sourceLot?.rawBatchCode || "",
+      origin: sourceLot?.supplier || "Production",
+      animalId: sourceLot?.animalId || "",
+      packedOn: document.getElementById("finished-packed-on").value,
+      useBy: document.getElementById("finished-useby").value,
+      quantity: Number(document.getElementById("finished-quantity").value),
+      unit: document.getElementById("finished-unit").value,
+      yield: document.getElementById("finished-weight").value.trim(),
+      weight: document.getElementById("finished-weight").value.trim(),
+      status: "Packed",
+      barcodeValue: normalizeBarcodeValue(
+        document.getElementById("finished-barcode").value.trim(),
+        product?.barcodeValue || product?.sku || "",
+      ),
+      note: document.getElementById("finished-note").value.trim(),
+      timeline: [
+        {
+          label: "Intake",
+          detail: `${sourceLot?.intakeCode || "Source lot"} received from ${sourceLot?.supplier || "supplier"} and opened as raw batch ${sourceLot?.rawBatchCode || "RAW"}.`,
+          time: "05:45",
+        },
+        {
+          label: "Production",
+          detail: document.getElementById("finished-note").value.trim() || "Source stock booked into production.",
+          time: "08:30",
+        },
+        {
+          label: "Packing",
+          detail: `${document.getElementById("finished-quantity").value} ${document.getElementById("finished-unit").value} packed into finished batch ${document.getElementById("finished-batch-code").value.trim().toUpperCase()}.`,
+          time: "11:10",
+        },
+      ],
+    };
+
+    if (!payload.id || !payload.product || !payload.sourceLotId || !payload.packedOn || Number.isNaN(payload.quantity)) {
+      setFinishedBatchFeedback("Choose a product and source lot, then enter a batch code, packed date, and quantity.", "danger");
+      return;
+    }
+
+    if (finishedBatches.some((batch) => batch.id === payload.id)) {
+      setFinishedBatchFeedback("That finished batch code already exists.", "danger");
+      return;
+    }
+
+    setFinishedBatchFeedback(traceabilityLiveEnabled ? "Saving finished batch to Supabase." : "Saving finished batch locally.", "muted");
+
+    try {
+      if (traceabilityLiveEnabled) {
+        await saveFinishedBatchToSupabase(payload);
+      }
+
+      finishedBatches = [payload, ...finishedBatches];
+      inboundLots = inboundLots.map((lot) =>
+        lot.id === payload.sourceLotId
+          ? { ...lot, status: "Consumed" }
+          : lot,
+      );
+      persistTraceabilityState();
+      renderStorefront();
+      renderBatches(payload.id);
+      syncLabelFormToBatch(payload.id);
+      stockActivity.unshift({
+        time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+        message: `${payload.id}: ${payload.product} linked to intake ${payload.sourceIntakeCode}.`,
+      });
+      renderStockActivity();
+      setFinishedBatchFeedback(`Finished batch ${payload.id} created and linked to intake ${payload.sourceIntakeCode}.`, "success");
+    } catch (error) {
+      setFinishedBatchFeedback(error.message || "Unable to save the finished batch.", "danger");
+    }
   });
 }
 
@@ -2123,6 +2734,21 @@ window.addEventListener("afterprint", () => {
 });
 
 const labelForm = document.getElementById("label-form");
+if (labelSourceBatchInput) {
+  labelSourceBatchInput.addEventListener("change", () => {
+    syncLabelFormToBatch(labelSourceBatchInput.value);
+    updateLabelPreview({
+      product: document.getElementById("label-product").value.trim(),
+      batch: document.getElementById("label-batch").value.trim(),
+      packed: document.getElementById("label-packed").value,
+      useby: document.getElementById("label-useby").value,
+      weight: document.getElementById("label-weight").value.trim(),
+      price: document.getElementById("label-price").value.trim(),
+      barcode: document.getElementById("label-barcode").value.trim(),
+    });
+  });
+}
+
 if (labelForm) {
   labelForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -2192,6 +2818,7 @@ if (signOutButton) {
 
 async function bootstrapPage() {
   mergeStoredProducts();
+  mergeStoredTraceability();
   renderStorefront();
   if (labelForm) {
     updateLabelPreview({
@@ -2270,6 +2897,16 @@ async function bootstrapPage() {
     );
 
     await fetchLiveDeliveries();
+    try {
+      await fetchLiveTraceability();
+      renderStorefront();
+    } catch (traceabilityError) {
+      console.error("Supabase traceability sync failed:", traceabilityError);
+      setDashboardAuthStatus(
+        `${staffAccount.staff_profiles?.first_name || staffAccount.email} is signed in. Traceability is using local fallback data because live sync failed.`,
+        "danger",
+      );
+    }
     if (deliveryDateInput && !getDeliveriesForDate(deliveryDateInput.value).length) {
       deliveryDateInput.value = formatDateForInput(deliveryOrders[0]?.requestedFor || new Date());
     }
@@ -2290,6 +2927,10 @@ if (window.location.hash === "#traceability") {
 
 if (window.location.hash === "#products") {
   setActiveTab("products");
+}
+
+if (window.location.hash === "#intake") {
+  setActiveTab("intake");
 }
 
 if (window.location.hash === "#labels") {
