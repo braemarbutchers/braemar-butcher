@@ -482,16 +482,33 @@ function generateCode39Svg(value) {
   )}" preserveAspectRatio="none">${bars}</svg>`;
 }
 
-function buildBarcodeImageMarkup(value) {
+function buildBarcodeBarsMarkup(value) {
   const normalizedValue = normalizeBarcodeValue(value);
-  const svgMarkup = generateCode39Svg(normalizedValue);
-  if (!svgMarkup) {
+  if (!normalizedValue) {
     return "";
   }
 
-  return `<img alt="Barcode ${escapeSvgText(normalizedValue)}" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-    svgMarkup,
-  )}" />`;
+  const encodedValue = `*${normalizedValue}*`;
+  const narrowWidth = 2;
+  const wideWidth = 5;
+  let bars = "";
+
+  for (const character of encodedValue) {
+    const pattern = CODE39_PATTERNS[character];
+    if (!pattern) {
+      return "";
+    }
+
+    for (let index = 0; index < pattern.length; index += 1) {
+      const width = pattern[index] === "w" ? wideWidth : narrowWidth;
+      const className = index % 2 === 0 ? "barcode-bar" : "barcode-space";
+      bars += `<span class="${className}" style="width:${width}px"></span>`;
+    }
+
+    bars += '<span class="barcode-gap" style="width:2px"></span>';
+  }
+
+  return `<span class="barcode-bars" role="img" aria-label="Barcode ${escapeSvgText(normalizedValue)}">${bars}</span>`;
 }
 
 function renderBarcodePreview(value) {
@@ -502,7 +519,7 @@ function renderBarcodePreview(value) {
   const normalizedValue = normalizeBarcodeValue(value);
   previewBarcodeValue.textContent = normalizedValue || "NO TILL CODE";
   previewBarcodeSvg.innerHTML = normalizedValue
-    ? buildBarcodeImageMarkup(normalizedValue)
+    ? buildBarcodeBarsMarkup(normalizedValue)
     : '<div class="empty-state">Add a till code to print a scannable barcode.</div>';
 }
 

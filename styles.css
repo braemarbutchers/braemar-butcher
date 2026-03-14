@@ -1196,6 +1196,34 @@ select {
   gap: 8px;
 }
 
+.barcode-svg {
+  overflow: hidden;
+}
+
+.barcode-bars {
+  display: flex;
+  align-items: stretch;
+  height: 72px;
+  width: 100%;
+}
+
+.barcode-bar,
+.barcode-space,
+.barcode-gap {
+  display: block;
+  height: 100%;
+  flex: 0 0 auto;
+}
+
+.barcode-bar {
+  background: #000;
+}
+
+.barcode-space,
+.barcode-gap {
+  background: transparent;
+}
+
 .barcode-svg img,
 .barcode-svg svg {
   display: block;
@@ -1459,6 +1487,7 @@ select {
     line-height: 1;
   }
 
+  body.printing-label-sheet #label-preview .barcode-bars,
   body.printing-label-sheet #label-preview .barcode-svg img,
   body.printing-label-sheet #label-preview .barcode-svg svg {
     height: 8mm;
