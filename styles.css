@@ -1509,17 +1509,8 @@ select {
 
   body.printing-driver-sheet .driver-print-sheet {
     display: grid !important;
-    gap: 12px;
+    gap: 18px;
     color: #000;
-  }
-
-  body.printing-driver-sheet .driver-sheet-header h2 {
-    font-size: 20pt;
-  }
-
-  body.printing-driver-sheet .driver-sheet-summary,
-  body.printing-driver-sheet .driver-stop-list {
-    gap: 10px;
   }
 
   body.printing-driver-sheet .driver-stop,
@@ -1527,47 +1518,8 @@ select {
     border-color: rgba(0, 0, 0, 0.18);
   }
 
-  body.printing-driver-sheet .driver-stop {
-    padding: 12px 14px;
-    border-radius: 12px;
-  }
-
-  body.printing-driver-sheet .driver-stop-list {
-    display: block;
-  }
-
-  body.printing-driver-sheet .driver-stop:nth-child(2n) {
-    break-after: page;
-    page-break-after: always;
-  }
-
-  body.printing-driver-sheet .driver-stop:last-child {
-    break-after: auto;
-    page-break-after: auto;
-  }
-
-  body.printing-driver-sheet .driver-stop-head,
-  body.printing-driver-sheet .driver-stop-grid {
-    gap: 8px;
-  }
-
-  body.printing-driver-sheet .driver-stop h3 {
-    font-size: 14pt;
-  }
-
-  body.printing-driver-sheet .driver-stop-number,
-  body.printing-driver-sheet .driver-stop-block span,
-  body.printing-driver-sheet .driver-sheet-summary span,
-  body.printing-driver-sheet .driver-stop-grid span {
-    font-size: 8.5pt;
-  }
-
-  body.printing-driver-sheet .driver-stop-block {
-    margin-top: 8px;
-  }
-
   body.printing-driver-sheet .driver-sheet-summary > div {
-    padding: 10px 12px;
+    padding: 12px;
     border: 1px solid var(--line);
     border-radius: 12px;
   }

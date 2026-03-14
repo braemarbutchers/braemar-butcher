@@ -154,6 +154,7 @@ let inboundLots = [
     cutDescription: "Loin and saddle allocation",
     supplierLotCode: "BRS-LM-4421",
     animalId: "UK7720 900122",
+    slaughterDate: "2026-03-12",
     receivedAt: "2026-03-13",
     useBy: "2026-03-19",
     weightKg: 24.5,
@@ -170,6 +171,7 @@ let inboundLots = [
     cutDescription: "Trim for pie filling",
     supplierLotCode: "BEEF-TRIM-4421",
     animalId: "BEEF-TRIM-4421",
+    slaughterDate: "2026-03-12",
     receivedAt: "2026-03-13",
     useBy: "2026-03-18",
     weightKg: 18.2,
@@ -186,6 +188,7 @@ let inboundLots = [
     cutDescription: "Mixed estate venison cuts",
     supplierLotCode: "ESTATE-VN-184",
     animalId: "ESTATE-VN-184",
+    slaughterDate: "2026-03-12",
     receivedAt: "2026-03-13",
     useBy: "2026-03-17",
     weightKg: 32.4,
@@ -213,6 +216,7 @@ let finishedBatches = [
     status: "Packed",
     barcodeValue: "DB-PIE-01",
     note: "Pie filling cooked and packed into chilled finished goods.",
+    salesAllocations: [{ orderItemId: "77777777-7777-7777-7777-777777777771", quantity: 1, orderNumber: "ORD-20260310-001" }],
     timeline: [
       { label: "Intake", detail: "Beef trim intake received and checked into raw batch RAW-260313-BF-01.", time: "05:55" },
       { label: "Trim allocation", detail: "Beef trim released from morning cutting list into pie production.", time: "06:15" },
@@ -238,6 +242,7 @@ let finishedBatches = [
     status: "Picked",
     barcodeValue: "BB-LAM-02",
     note: "Trimmed and packed for retail trays.",
+    salesAllocations: [],
     timeline: [
       { label: "Farm intake", detail: "Collected from Braeside Lamb with movement docs verified.", time: "05:40" },
       { label: "Boning", detail: "Trimmed and frenched for retail packs.", time: "08:10" },
@@ -263,6 +268,7 @@ let finishedBatches = [
     status: "Awaiting dispatch",
     barcodeValue: "DB-VEN-04",
     note: "Mixed cuts assembled into webshop boxes.",
+    salesAllocations: [],
     timeline: [
       { label: "Field collection", detail: "Estate batch logged with stalker ID and timestamp.", time: "04:55" },
       { label: "Inspection", detail: "Game handling check complete before breakdown.", time: "06:45" },
@@ -1418,7 +1424,7 @@ async function fetchLiveTraceability() {
   const [{ data: lots, error: lotsError }, { data: batchesData, error: batchesError }] = await Promise.all([
     supabase
       .from("inbound_lots")
-      .select("id, intake_code, source_type, species, cut_description, supplier_lot_code, received_at, use_by_date, received_weight_kg, status, notes, source_animals(animal_identifier), suppliers(name), stock_batches(batch_code, batch_type, quantity, status)")
+      .select("id, intake_code, source_type, species, cut_description, supplier_lot_code, received_at, use_by_date, received_weight_kg, status, notes, source_animals(animal_identifier, slaughter_date), suppliers(name), stock_batches(batch_code, batch_type, quantity, status)")
       .order("received_at", { ascending: false }),
     supabase
       .from("product_batches")
@@ -1429,6 +1435,14 @@ async function fetchLiveTraceability() {
         packed_unit,
         label_snapshot,
         products(name, sku),
+        order_item_batch_allocations(
+          quantity,
+          order_items(
+            id,
+            order_id,
+            customer_orders(order_number)
+          )
+        ),
         stock_batches (
           batch_code,
           packed_on,
@@ -1464,6 +1478,7 @@ async function fetchLiveTraceability() {
       cutDescription: lot.cut_description || "",
       supplierLotCode: lot.supplier_lot_code || "",
       animalId: lot.source_animals?.[0]?.animal_identifier || "",
+      slaughterDate: formatDateForInput(lot.source_animals?.[0]?.slaughter_date),
       receivedAt: formatDateForInput(lot.received_at),
       useBy: formatDateForInput(lot.use_by_date),
       weightKg: Number(rawBatch?.quantity ?? lot.received_weight_kg ?? 0),
@@ -1499,6 +1514,13 @@ async function fetchLiveTraceability() {
         status: titleCaseStatus(stockBatch.status),
         barcodeValue: normalizeBarcodeValue(row.retail_barcode, row.products?.sku || ""),
         note: snapshot.note || "",
+        salesAllocations: Array.isArray(row.order_item_batch_allocations)
+          ? row.order_item_batch_allocations.map((allocation) => ({
+              quantity: Number(allocation.quantity || 0),
+              orderItemId: allocation.order_items?.id || "",
+              orderNumber: allocation.order_items?.customer_orders?.order_number || "",
+            }))
+          : [],
         timeline: [
           {
             label: "Packed",
@@ -2171,16 +2193,24 @@ function renderScanResultByCode(rawCode) {
   if (finishedBatch) {
     const sourceLot = getInboundLotById(finishedBatch.sourceLotId);
     const product = findProductByName(finishedBatch.product);
+    const salesAllocations = Array.isArray(finishedBatch.salesAllocations) ? finishedBatch.salesAllocations : [];
+    const salesTimeline = salesAllocations.map((allocation) => ({
+      label: "Sold allocation",
+      detail: `${allocation.quantity} allocated to ${allocation.orderNumber || allocation.orderItemId || "recorded sale"}.`,
+      time: "14:20",
+    }));
     scanTitle.textContent = `${finishedBatch.product} · ${finishedBatch.id}`;
     scanMeta.innerHTML = `
       <div><strong>Type</strong><br />Finished batch</div>
       <div><strong>Source intake</strong><br />${finishedBatch.sourceIntakeCode || sourceLot?.intakeCode || "Not linked"}</div>
       <div><strong>Raw batch</strong><br />${finishedBatch.sourceBatchCode || sourceLot?.rawBatchCode || "Not recorded"}</div>
+      <div><strong>Kill date</strong><br />${formatDateForDisplay(sourceLot?.slaughterDate)}</div>
+      <div><strong>Source qty used</strong><br />${finishedBatch.sourceQuantityUsed || "Not recorded"} kg</div>
       <div><strong>Till code</strong><br />${finishedBatch.barcodeValue || product?.barcodeValue || product?.sku || "Not set"}</div>
       <div><strong>Status</strong><br />${finishedBatch.status}</div>
       <div><strong>Use by</strong><br />${formatDateForDisplay(finishedBatch.useBy)}</div>
     `;
-    scanTimeline.innerHTML = finishedBatch.timeline
+    scanTimeline.innerHTML = [...finishedBatch.timeline, ...salesTimeline]
       .map(
         (entry) => `
           <li>
@@ -2222,6 +2252,7 @@ function renderScanResultByCode(rawCode) {
       <div><strong>Species</strong><br />${intakeLot.species}</div>
       <div><strong>Raw batch</strong><br />${intakeLot.rawBatchCode || "Not created"}</div>
       <div><strong>Animal ID</strong><br />${intakeLot.animalId || "Not recorded"}</div>
+      <div><strong>Kill date</strong><br />${formatDateForDisplay(intakeLot.slaughterDate)}</div>
       <div><strong>Remaining qty</strong><br />${intakeLot.weightKg} kg</div>
       <div><strong>Status</strong><br />${intakeLot.status}</div>
     `;
