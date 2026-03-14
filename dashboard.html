@@ -64,6 +64,7 @@
               <button class="tab active" data-tab="stock" role="tab" aria-selected="true">Stock</button>
               <button class="tab" data-tab="intake" role="tab" aria-selected="false">Intake</button>
               <button class="tab" data-tab="traceability" role="tab" aria-selected="false">Tracing</button>
+              <button class="tab" data-tab="scan" role="tab" aria-selected="false">Scan</button>
               <button class="tab" data-tab="labels" role="tab" aria-selected="false">Labels</button>
             </div>
           </div>
@@ -447,6 +448,37 @@
                     </div>
                   </div>
                 </article>
+              </section>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="scan-panel">
+            <div class="panel-grid trace-grid">
+              <section class="panel action-panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Scan lookup</p>
+                  <h4>Scan or enter a trace code</h4>
+                </div>
+                <form id="scan-form">
+                  <label>
+                    Batch, intake, SKU, or till code
+                    <input id="scan-code" type="text" value="DB-260313-PIE" required />
+                  </label>
+                  <label>
+                    Quick pick
+                    <select id="scan-select"></select>
+                  </label>
+                  <button type="submit" class="button primary full-width">Show History</button>
+                  <p class="auth-feedback" id="scan-feedback">Use a finished batch code, intake code, product SKU, or till code.</p>
+                </form>
+              </section>
+              <section class="panel">
+                <div class="panel-head">
+                  <p class="eyebrow">Lookup result</p>
+                  <h4 id="scan-title">Awaiting scan</h4>
+                </div>
+                <div class="trace-meta" id="scan-meta"></div>
+                <ol class="timeline" id="scan-timeline"></ol>
               </section>
             </div>
           </div>

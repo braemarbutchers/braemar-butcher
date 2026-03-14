@@ -355,6 +355,13 @@ const batchList = document.getElementById("batch-list");
 const traceTitle = document.getElementById("trace-title");
 const traceMeta = document.getElementById("trace-meta");
 const traceTimeline = document.getElementById("trace-timeline");
+const scanForm = document.getElementById("scan-form");
+const scanCodeInput = document.getElementById("scan-code");
+const scanSelectInput = document.getElementById("scan-select");
+const scanTitle = document.getElementById("scan-title");
+const scanMeta = document.getElementById("scan-meta");
+const scanTimeline = document.getElementById("scan-timeline");
+const scanFeedback = document.getElementById("scan-feedback");
 const deliveryDateInput = document.getElementById("delivery-date");
 const deliverySummary = document.getElementById("delivery-summary");
 const deliveryList = document.getElementById("delivery-list");
@@ -997,6 +1004,15 @@ function setFinishedBatchFeedback(message, tone = "muted") {
 
   finishedBatchFeedback.textContent = message;
   finishedBatchFeedback.dataset.tone = tone;
+}
+
+function setScanFeedback(message, tone = "muted") {
+  if (!scanFeedback) {
+    return;
+  }
+
+  scanFeedback.textContent = message;
+  scanFeedback.dataset.tone = tone;
 }
 
 function formatDeliveryWindow(value) {
@@ -1832,6 +1848,31 @@ function populateLabelBatchOptions() {
     .join("");
 }
 
+function populateScanOptions() {
+  if (!scanSelectInput) {
+    return;
+  }
+
+  const options = [
+    ...finishedBatches.map((batch) => ({
+      value: batch.id,
+      label: `Finished · ${batch.id} · ${batch.product}`,
+    })),
+    ...inboundLots.map((lot) => ({
+      value: lot.intakeCode,
+      label: `Intake · ${lot.intakeCode} · ${lot.supplier}`,
+    })),
+    ...products.map((product) => ({
+      value: product.barcodeValue || product.sku,
+      label: `Product · ${product.barcodeValue || product.sku} · ${product.name}`,
+    })),
+  ];
+
+  scanSelectInput.innerHTML = options
+    .map((option) => `<option value="${option.value}">${option.label}</option>`)
+    .join("");
+}
+
 function syncLabelFormToBatch(batchId) {
   const batch = getFinishedBatchById(batchId) || finishedBatches[0];
   if (!batch) {
@@ -1876,6 +1917,7 @@ function hydrateTraceabilityForms() {
   populateFinishedBatchProductOptions();
   populateSourceLotOptions();
   populateLabelBatchOptions();
+  populateScanOptions();
 
   if (finishedProductInput && products.length && !finishedProductInput.value) {
     finishedProductInput.value = products[0].name;
@@ -1889,6 +1931,10 @@ function hydrateTraceabilityForms() {
 
   if (labelSourceBatchInput && finishedBatches.length) {
     syncLabelFormToBatch(labelSourceBatchInput.value || finishedBatches[0].id);
+  }
+
+  if (scanSelectInput && scanSelectInput.value && scanCodeInput && !scanCodeInput.value) {
+    scanCodeInput.value = scanSelectInput.value;
   }
 }
 
@@ -2099,6 +2145,141 @@ function renderInboundLots() {
       `,
     )
     .join("");
+}
+
+function renderScanResultByCode(rawCode) {
+  if (!scanTitle || !scanMeta || !scanTimeline) {
+    return;
+  }
+
+  const code = String(rawCode || "").trim().toUpperCase();
+  if (!code) {
+    scanTitle.textContent = "Awaiting scan";
+    scanMeta.innerHTML = "";
+    scanTimeline.innerHTML = "";
+    setScanFeedback("Use a finished batch code, intake code, product SKU, or till code.", "muted");
+    return;
+  }
+
+  const finishedBatch = finishedBatches.find(
+    (batch) =>
+      String(batch.id || "").toUpperCase() === code ||
+      String(batch.productSku || "").toUpperCase() === code ||
+      String(batch.barcodeValue || "").toUpperCase() === code,
+  );
+
+  if (finishedBatch) {
+    const sourceLot = getInboundLotById(finishedBatch.sourceLotId);
+    const product = findProductByName(finishedBatch.product);
+    scanTitle.textContent = `${finishedBatch.product} · ${finishedBatch.id}`;
+    scanMeta.innerHTML = `
+      <div><strong>Type</strong><br />Finished batch</div>
+      <div><strong>Source intake</strong><br />${finishedBatch.sourceIntakeCode || sourceLot?.intakeCode || "Not linked"}</div>
+      <div><strong>Raw batch</strong><br />${finishedBatch.sourceBatchCode || sourceLot?.rawBatchCode || "Not recorded"}</div>
+      <div><strong>Till code</strong><br />${finishedBatch.barcodeValue || product?.barcodeValue || product?.sku || "Not set"}</div>
+      <div><strong>Status</strong><br />${finishedBatch.status}</div>
+      <div><strong>Use by</strong><br />${formatDateForDisplay(finishedBatch.useBy)}</div>
+    `;
+    scanTimeline.innerHTML = finishedBatch.timeline
+      .map(
+        (entry) => `
+          <li>
+            <strong>${entry.label} <span>${entry.time}</span></strong>
+            <div>${entry.detail}</div>
+          </li>
+        `,
+      )
+      .join("");
+    setScanFeedback(`Showing finished batch history for ${finishedBatch.id}.`, "success");
+    return;
+  }
+
+  const intakeLot = inboundLots.find(
+    (lot) =>
+      String(lot.intakeCode || "").toUpperCase() === code ||
+      String(lot.rawBatchCode || "").toUpperCase() === code ||
+      String(lot.animalId || "").toUpperCase() === code,
+  );
+
+  if (intakeLot) {
+    const derivedOutputs = finishedBatches.filter((batch) => batch.sourceLotId === intakeLot.id);
+    const intakeTimeline = [
+      {
+        label: "Intake received",
+        detail: `${intakeLot.weightKg} kg received from ${intakeLot.supplier}${intakeLot.cutDescription ? ` as ${intakeLot.cutDescription}` : ""}.`,
+        time: "05:45",
+      },
+      ...derivedOutputs.map((batch) => ({
+        label: "Production output",
+        detail: `${batch.id} created for ${batch.product} using ${batch.sourceQuantityUsed || "recorded source"} kg from ${intakeLot.rawBatchCode}.`,
+        time: "11:10",
+      })),
+    ];
+
+    scanTitle.textContent = `${intakeLot.intakeCode} · ${intakeLot.supplier}`;
+    scanMeta.innerHTML = `
+      <div><strong>Type</strong><br />Inbound lot</div>
+      <div><strong>Species</strong><br />${intakeLot.species}</div>
+      <div><strong>Raw batch</strong><br />${intakeLot.rawBatchCode || "Not created"}</div>
+      <div><strong>Animal ID</strong><br />${intakeLot.animalId || "Not recorded"}</div>
+      <div><strong>Remaining qty</strong><br />${intakeLot.weightKg} kg</div>
+      <div><strong>Status</strong><br />${intakeLot.status}</div>
+    `;
+    scanTimeline.innerHTML = intakeTimeline
+      .map(
+        (entry) => `
+          <li>
+            <strong>${entry.label} <span>${entry.time}</span></strong>
+            <div>${entry.detail}</div>
+          </li>
+        `,
+      )
+      .join("");
+    setScanFeedback(`Showing intake history for ${intakeLot.intakeCode}.`, "success");
+    return;
+  }
+
+  const matchedProduct = products.find(
+    (product) =>
+      String(product.sku || "").toUpperCase() === code ||
+      String(product.barcodeValue || "").toUpperCase() === code,
+  );
+
+  if (matchedProduct) {
+    const relatedBatches = finishedBatches.filter(
+      (batch) =>
+        String(batch.productSku || "").toUpperCase() === String(matchedProduct.sku || "").toUpperCase() ||
+        String(batch.barcodeValue || "").toUpperCase() === code,
+    );
+
+    scanTitle.textContent = `${matchedProduct.name} · ${matchedProduct.sku}`;
+    scanMeta.innerHTML = `
+      <div><strong>Type</strong><br />Product code</div>
+      <div><strong>SKU</strong><br />${matchedProduct.sku}</div>
+      <div><strong>Till code</strong><br />${matchedProduct.barcodeValue || matchedProduct.sku}</div>
+      <div><strong>Recent batches</strong><br />${relatedBatches.length}</div>
+      <div><strong>Price</strong><br />${formatCurrency(matchedProduct.price)}</div>
+    `;
+    scanTimeline.innerHTML = relatedBatches.length
+      ? relatedBatches
+          .map(
+            (batch) => `
+              <li>
+                <strong>${batch.id} <span>${formatDateForDisplay(batch.packedOn)}</span></strong>
+                <div>${batch.quantity} ${batch.unit} packed from ${batch.sourceIntakeCode || "unlinked intake"}.</div>
+              </li>
+            `,
+          )
+          .join("")
+      : '<li><strong>No finished batches found</strong><div>This product exists in the catalogue, but no traceable finished batches match the scanned code yet.</div></li>';
+    setScanFeedback(`Showing trace matches for product code ${code}.`, "success");
+    return;
+  }
+
+  scanTitle.textContent = `No match for ${code}`;
+  scanMeta.innerHTML = "";
+  scanTimeline.innerHTML = '<li><strong>No trace match</strong><div>Try a finished batch code, intake code, raw batch code, SKU, or till code.</div></li>';
+  setScanFeedback(`No trace history found for ${code}.`, "danger");
 }
 
 function renderDeliveries() {
@@ -2398,6 +2579,7 @@ function renderStorefront() {
   renderInboundLots();
   hydrateTraceabilityForms();
   renderBatches();
+  renderScanResultByCode(scanCodeInput?.value || finishedBatches[0]?.id || inboundLots[0]?.intakeCode || "");
 }
 
 function showLiveDataState(isLive) {
@@ -2534,6 +2716,22 @@ if (intakeForm) {
 if (finishedSourceLotInput) {
   finishedSourceLotInput.addEventListener("change", () => {
     syncFinishedBatchSourceDefaults();
+  });
+}
+
+if (scanSelectInput) {
+  scanSelectInput.addEventListener("change", () => {
+    if (scanCodeInput) {
+      scanCodeInput.value = scanSelectInput.value;
+    }
+    renderScanResultByCode(scanSelectInput.value);
+  });
+}
+
+if (scanForm) {
+  scanForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    renderScanResultByCode(scanCodeInput?.value || "");
   });
 }
 
@@ -3112,6 +3310,10 @@ if (window.location.hash === "#intake") {
 
 if (window.location.hash === "#labels") {
   setActiveTab("labels");
+}
+
+if (window.location.hash === "#scan") {
+  setActiveTab("scan");
 }
 
 if (window.location.hash === "#deliveries") {
