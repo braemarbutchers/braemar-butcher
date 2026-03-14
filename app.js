@@ -1,6 +1,7 @@
 const fallbackProducts = [
   {
     id: "steak-pie",
+    sku: "DB-PIE-01",
     name: "Family Steak Pie",
     description: "Rich braising steak in gravy, prepared for oven finishing at home.",
     price: 12.5,
@@ -11,6 +12,7 @@ const fallbackProducts = [
   },
   {
     id: "sausages",
+    sku: "DB-SAU-02",
     name: "Davidson's Pork Sausages",
     description: "Traditional butcher's sausages for breakfasts, trays and freezer stock.",
     price: 5.95,
@@ -21,6 +23,7 @@ const fallbackProducts = [
   },
   {
     id: "venison-box",
+    sku: "DB-VEN-04",
     name: "Braemar Venison Box",
     description: "Seasonal venison cuts selected for slow cooking and roasting.",
     price: 38.0,
@@ -31,6 +34,7 @@ const fallbackProducts = [
   },
   {
     id: "lamb-loin",
+    sku: "BB-LAM-02",
     name: "Lamb Loin Chops",
     description: "Tender lamb chops hand-cut for the counter and weekend orders.",
     price: 12.5,
@@ -41,6 +45,7 @@ const fallbackProducts = [
   },
   {
     id: "breakfast-pack",
+    sku: "DB-BRK-06",
     name: "Breakfast Pack",
     description: "Sausage, black pudding, dry cure bacon and haggis slices.",
     price: 22.0,
@@ -51,6 +56,7 @@ const fallbackProducts = [
   },
   {
     id: "haggis",
+    sku: "DB-HAG-03",
     name: "Traditional Haggis",
     description: "Prepared for local customers wanting a dependable Scottish staple.",
     price: 7.5,
@@ -61,6 +67,7 @@ const fallbackProducts = [
   },
   {
     id: "sirloin-box",
+    sku: "DB-SIR-05",
     name: "Sirloin Family Box",
     description: "Sharing steaks and roasting cuts packed for collection or delivery.",
     price: 44.0,
@@ -129,9 +136,56 @@ const batches = [
 const LOCAL_PRODUCTS_STORAGE_KEY = "braemar.customProducts";
 const LOCAL_PRODUCT_IMAGES_STORAGE_KEY = "braemar.productImages";
 const MAX_PRODUCT_IMAGE_SIZE_BYTES = 2 * 1024 * 1024;
+const CODE39_PATTERNS = {
+  "0": "nnnwwnwnn",
+  "1": "wnnwnnnnw",
+  "2": "nnwwnnnnw",
+  "3": "wnwwnnnnn",
+  "4": "nnnwwnnnw",
+  "5": "wnnwwnnnn",
+  "6": "nnwwwnnnn",
+  "7": "nnnwnnwnw",
+  "8": "wnnwnnwnn",
+  "9": "nnwwnnwnn",
+  A: "wnnnnwnnw",
+  B: "nnwnnwnnw",
+  C: "wnwnnwnnn",
+  D: "nnnnwwnnw",
+  E: "wnnnwwnnn",
+  F: "nnwnwwnnn",
+  G: "nnnnnwwnw",
+  H: "wnnnnwwnn",
+  I: "nnwnnwwnn",
+  J: "nnnnwwwnn",
+  K: "wnnnnnnww",
+  L: "nnwnnnnww",
+  M: "wnwnnnnwn",
+  N: "nnnnwnnww",
+  O: "wnnnwnnwn",
+  P: "nnwnwnnwn",
+  Q: "nnnnnnwww",
+  R: "wnnnnnwwn",
+  S: "nnwnnnwwn",
+  T: "nnnnwnwwn",
+  U: "wwnnnnnnw",
+  V: "nwwnnnnnw",
+  W: "wwwnnnnnn",
+  X: "nwnnwnnnw",
+  Y: "wwnnwnnnn",
+  Z: "nwwnwnnnn",
+  "-": "nwnnnnwnw",
+  ".": "wwnnnnwnn",
+  " ": "nwwnnnwnn",
+  $: "nwnwnwnnn",
+  "/": "nwnwnnnwn",
+  "+": "nwnnnwnwn",
+  "%": "nnnwnwnwn",
+  "*": "nwnnwnwnn",
+};
 
 let products = [...fallbackProducts];
 let liveProductsEnabled = false;
+let editingProductSku = "";
 let deliveryOrders = [
   {
     id: "DEL-001",
@@ -231,11 +285,16 @@ const productUnitInput = document.getElementById("product-unit");
 const productPriceInput = document.getElementById("product-price");
 const productStockInput = document.getElementById("product-stock");
 const productThresholdInput = document.getElementById("product-threshold");
+const productBarcodeInput = document.getElementById("product-barcode");
 const productImageInput = document.getElementById("product-image");
 const productImagePreview = document.getElementById("product-image-preview");
 const productImagePreviewImg = document.getElementById("product-image-preview-img");
+const productFormTitle = document.getElementById("product-form-title");
+const productSubmitButton = document.getElementById("product-submit-button");
+const productCancelButton = document.getElementById("product-cancel-button");
 const productFormFeedback = document.getElementById("product-form-feedback");
 const productAdminList = document.getElementById("product-admin-list");
+const labelBarcodeInput = document.getElementById("label-barcode");
 const shopHeading = document.querySelector("#shop .section-heading h3");
 const heroText = document.querySelector(".retail-section .section-heading .eyebrow");
 const staffAuthForm = document.getElementById("staff-auth-form");
@@ -245,6 +304,8 @@ const authFeedback = document.getElementById("auth-feedback");
 const dashboardAuthStatus = document.getElementById("dashboard-auth-status");
 const signOutButton = document.getElementById("sign-out-button");
 const operationsSection = document.getElementById("operations");
+const previewBarcodeSvg = document.getElementById("preview-barcode-svg");
+const previewBarcodeValue = document.getElementById("preview-barcode-value");
 
 const isDashboardPage = Boolean(operationsSection);
 const isStaffLoginPage = Boolean(staffAuthForm);
@@ -275,6 +336,77 @@ function buildProductArt(index) {
 
 function buildUploadedProductArt(imageUrl) {
   return `linear-gradient(135deg, rgba(81, 16, 25, 0.24), rgba(81, 16, 25, 0.68)), url("${imageUrl}") center/cover`;
+}
+
+function escapeSvgText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function normalizeBarcodeValue(value, fallback = "") {
+  const rawValue = String(value || fallback || "").toUpperCase().trim();
+  return rawValue.replace(/[^0-9A-Z. \-$/+%]/g, "");
+}
+
+function generateCode39Svg(value) {
+  const normalizedValue = normalizeBarcodeValue(value);
+  if (!normalizedValue) {
+    return "";
+  }
+
+  const encodedValue = `*${normalizedValue}*`;
+  const narrowWidth = 2;
+  const wideWidth = 5;
+  const quietZone = 12;
+  const interCharacterGap = 2;
+  const barHeight = 54;
+  let x = quietZone;
+  let bars = "";
+
+  for (const character of encodedValue) {
+    const pattern = CODE39_PATTERNS[character];
+    if (!pattern) {
+      return "";
+    }
+
+    for (let index = 0; index < pattern.length; index += 1) {
+      const width = pattern[index] === "w" ? wideWidth : narrowWidth;
+      if (index % 2 === 0) {
+        bars += `<rect x="${x}" y="0" width="${width}" height="${barHeight}" fill="#000" />`;
+      }
+      x += width;
+    }
+
+    x += interCharacterGap;
+  }
+
+  const width = x + quietZone;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${barHeight}" role="img" aria-label="Barcode ${escapeSvgText(
+    normalizedValue,
+  )}" preserveAspectRatio="none">${bars}</svg>`;
+}
+
+function renderBarcodePreview(value) {
+  if (!previewBarcodeSvg || !previewBarcodeValue) {
+    return;
+  }
+
+  const normalizedValue = normalizeBarcodeValue(value);
+  previewBarcodeValue.textContent = normalizedValue || "NO TILL CODE";
+  previewBarcodeSvg.innerHTML = normalizedValue
+    ? generateCode39Svg(normalizedValue)
+    : '<div class="empty-state">Add a till code to print a scannable barcode.</div>';
+}
+
+function getProductBarcodeValueByName(productName) {
+  const matchingProduct = products.find(
+    (product) => String(product.name || "").trim().toLowerCase() === String(productName || "").trim().toLowerCase(),
+  );
+
+  return normalizeBarcodeValue(matchingProduct?.barcodeValue, matchingProduct?.sku || "");
 }
 
 function readStorageJson(key, fallbackValue) {
@@ -321,6 +453,21 @@ function upsertStoredProductImage(sku, imageDataUrl) {
   saveStoredProductImages(images);
 }
 
+function moveStoredProductImage(previousSku, nextSku) {
+  if (!previousSku || !nextSku || previousSku === nextSku) {
+    return;
+  }
+
+  const images = loadStoredProductImages();
+  if (!images[previousSku]) {
+    return;
+  }
+
+  images[nextSku] = images[previousSku];
+  delete images[previousSku];
+  saveStoredProductImages(images);
+}
+
 function applyStoredProductImages(productList) {
   const storedImages = loadStoredProductImages();
 
@@ -345,25 +492,42 @@ function mergeStoredProducts() {
     return;
   }
 
-  const existingSkus = new Set(products.map((product) => String(product.sku || "").toUpperCase()));
   const mergedProducts = [...products];
   const mergedInventory = [...inventory];
 
   storedProducts.forEach((storedProduct) => {
     const normalizedSku = String(storedProduct.sku || "").toUpperCase();
-    if (!normalizedSku || existingSkus.has(normalizedSku)) {
+    if (!normalizedSku) {
       return;
     }
 
-    const productRecord = createProductRecord(storedProduct, mergedProducts.length);
-    mergedProducts.push(productRecord);
-    mergedInventory.push({
-      sku: normalizedSku,
-      product: storedProduct.name,
-      onHand: storedProduct.openingStock,
-      threshold: storedProduct.threshold,
-    });
-    existingSkus.add(normalizedSku);
+    const productIndex = mergedProducts.findIndex((product) => String(product.sku || "").toUpperCase() === normalizedSku);
+    if (productIndex >= 0) {
+      mergedProducts[productIndex] = createProductRecord(
+        { ...mergedProducts[productIndex], ...storedProduct },
+        productIndex,
+      );
+    } else {
+      mergedProducts.push(createProductRecord(storedProduct, mergedProducts.length));
+    }
+
+    const inventoryIndex = mergedInventory.findIndex((item) => String(item.sku || "").toUpperCase() === normalizedSku);
+    if (inventoryIndex >= 0) {
+      mergedInventory[inventoryIndex] = {
+        ...mergedInventory[inventoryIndex],
+        sku: normalizedSku,
+        product: storedProduct.name,
+        onHand: storedProduct.openingStock,
+        threshold: storedProduct.threshold,
+      };
+    } else {
+      mergedInventory.push({
+        sku: normalizedSku,
+        product: storedProduct.name,
+        onHand: storedProduct.openingStock,
+        threshold: storedProduct.threshold,
+      });
+    }
   });
 
   products = applyStoredProductImages(mergedProducts);
@@ -375,6 +539,23 @@ function persistCustomProduct(product) {
   const storedProducts = loadStoredProducts();
   storedProducts.push(product);
   saveStoredProducts(storedProducts);
+}
+
+function updateStoredCustomProduct(originalSku, updatedProduct) {
+  const normalizedOriginalSku = String(originalSku || "").toUpperCase();
+  const storedProducts = loadStoredProducts();
+  const existingIndex = storedProducts.findIndex(
+    (product) => String(product.sku || "").toUpperCase() === normalizedOriginalSku,
+  );
+  const nextProducts = [...storedProducts];
+
+  if (existingIndex >= 0) {
+    nextProducts[existingIndex] = updatedProduct;
+  } else {
+    nextProducts.push(updatedProduct);
+  }
+
+  saveStoredProducts(nextProducts);
 }
 
 function previewProductImage(imageDataUrl) {
@@ -390,6 +571,93 @@ function previewProductImage(imageDataUrl) {
 
   productImagePreview.hidden = false;
   productImagePreviewImg.src = imageDataUrl;
+}
+
+function resetProductForm() {
+  editingProductSku = "";
+  productForm?.reset();
+
+  if (productFormTitle) {
+    productFormTitle.textContent = "Add a new product";
+  }
+
+  if (productSubmitButton) {
+    productSubmitButton.textContent = "Add Product";
+  }
+
+  if (productCancelButton) {
+    productCancelButton.hidden = true;
+  }
+
+  if (productSkuInput) {
+    productSkuInput.value = "";
+  }
+  if (productNameInput) {
+    productNameInput.value = "";
+  }
+  if (productDescriptionInput) {
+    productDescriptionInput.value = "";
+  }
+  if (productUnitInput) {
+    productUnitInput.value = "item";
+  }
+  if (productPriceInput) {
+    productPriceInput.value = "";
+  }
+  if (productStockInput) {
+    productStockInput.value = "0";
+  }
+  if (productThresholdInput) {
+    productThresholdInput.value = "0";
+  }
+  if (productBarcodeInput) {
+    productBarcodeInput.value = "";
+  }
+  if (productImageInput) {
+    productImageInput.value = "";
+  }
+
+  previewProductImage("");
+}
+
+function populateProductFormForEdit(sku) {
+  const normalizedSku = String(sku || "").toUpperCase();
+  const product = products.find((entry) => String(entry.sku || "").toUpperCase() === normalizedSku);
+  const inventoryItem = inventory.find((entry) => String(entry.sku || "").toUpperCase() === normalizedSku);
+
+  if (!product) {
+    setProductFeedback("That product could not be found.", "danger");
+    return;
+  }
+
+  editingProductSku = normalizedSku;
+  productSkuInput.value = product.sku || "";
+  productNameInput.value = product.name || "";
+  productDescriptionInput.value = product.description || "";
+  productUnitInput.value = product.unit || "item";
+  productPriceInput.value = String(product.price ?? "");
+  productStockInput.value = String(inventoryItem?.onHand ?? 0);
+  productThresholdInput.value = String(inventoryItem?.threshold ?? 0);
+  productBarcodeInput.value = normalizeBarcodeValue(product.barcodeValue, product.sku || "");
+  if (productImageInput) {
+    productImageInput.value = "";
+  }
+
+  if (productFormTitle) {
+    productFormTitle.textContent = `Edit ${product.name}`;
+  }
+
+  if (productSubmitButton) {
+    productSubmitButton.textContent = "Save Changes";
+  }
+
+  if (productCancelButton) {
+    productCancelButton.hidden = false;
+  }
+
+  previewProductImage(product.imageDataUrl || "");
+  setProductFeedback(`Editing ${product.name}. Update the fields and save your changes.`, "muted");
+  setActiveTab("products");
 }
 
 function readFileAsDataUrl(file) {
@@ -441,13 +709,14 @@ function normalizeSupabaseProducts(rows) {
     stockImpact: 1,
     art: row.imageDataUrl ? buildUploadedProductArt(row.imageDataUrl) : buildProductArt(index),
     imageDataUrl: row.imageDataUrl || "",
+    barcodeValue: normalizeBarcodeValue(row.barcodeValue, row.sku),
     unit: row.unit || "item",
   }));
 }
 
 function createProductRecord(product, index = products.length) {
   return {
-    id: slugifyProductName(product.sku || product.name || `product-${index + 1}`),
+    id: product.id || slugifyProductName(product.sku || product.name || `product-${index + 1}`),
     sku: product.sku,
     name: product.name,
     description: product.description || "Prepared fresh for local collection or delivery.",
@@ -456,6 +725,7 @@ function createProductRecord(product, index = products.length) {
     stockImpact: 1,
     art: product.imageDataUrl ? buildUploadedProductArt(product.imageDataUrl) : buildProductArt(index),
     imageDataUrl: product.imageDataUrl || "",
+    barcodeValue: normalizeBarcodeValue(product.barcodeValue, product.sku),
     unit: product.unit || "item",
   };
 }
@@ -710,6 +980,32 @@ function setDashboardAuthStatus(message, tone = "muted") {
   dashboardAuthStatus.dataset.tone = tone;
 }
 
+function buildStaffAccessMessage(status, email) {
+  const accountLabel = email || "This account";
+
+  if (status === "no-user") {
+    return "Sign in with a staff user created in Supabase Auth.";
+  }
+
+  if (status === "no-profile") {
+    return `${accountLabel} is authenticated but has no profile row yet. Ask an admin to finish staff provisioning.`;
+  }
+
+  if (status === "inactive") {
+    return `${accountLabel} is provisioned but not active. Ask an admin to reactivate the account.`;
+  }
+
+  if (status === "not-staff") {
+    return `${accountLabel} is signed in, but the role is not staff or admin. Ask an admin to promote the user in Supabase.`;
+  }
+
+  if (status === "missing-staff-profile") {
+    return `${accountLabel} has a staff role but no staff permissions profile. Ask an admin to run staff provisioning.`;
+  }
+
+  return `${accountLabel} is not provisioned for operations access.`;
+}
+
 async function getCurrentStaffAccount(supabase) {
   const {
     data: { user },
@@ -720,36 +1016,54 @@ async function getCurrentStaffAccount(supabase) {
     throw userError;
   }
 
-  if (!user?.email) {
-    return null;
+  if (!user?.id || !user?.email) {
+    return { status: "no-user", user: null, account: null };
   }
 
   const email = user.email.toLowerCase();
   const { data, error } = await supabase
-    .from("app_users")
+    .from("profiles")
     .select(
       `
-        id,
+        user_id,
         email,
         role,
         status,
-        staff_profiles(first_name, last_name, job_title, department)
+        staff_profiles(first_name, last_name, job_title, department, can_manage_inventory, can_manage_orders, can_manage_clients, can_manage_billing)
       `,
     )
-    .eq("email", email)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  if (!data || !["admin", "staff"].includes(data.role) || data.status !== "active") {
-    return null;
+  if (!data) {
+    return { status: "no-profile", user, email, account: null };
+  }
+
+  if (data.status !== "active") {
+    return { status: "inactive", user, email, account: data };
+  }
+
+  if (!["admin", "staff"].includes(data.role)) {
+    return { status: "not-staff", user, email, account: data };
+  }
+
+  if (!data.staff_profiles) {
+    return { status: "missing-staff-profile", user, email, account: data };
   }
 
   return {
-    ...data,
-    authEmail: email,
+    status: "ok",
+    user,
+    email,
+    account: {
+      ...data,
+      id: data.user_id,
+      authEmail: email,
+    },
   };
 }
 
@@ -767,19 +1081,22 @@ async function ensureStaffSession(supabase) {
     return null;
   }
 
-  const staffAccount = await getCurrentStaffAccount(supabase);
-  if (!staffAccount) {
+  const access = await getCurrentStaffAccount(supabase);
+  if (!access || access.status !== "ok") {
     await supabase.auth.signOut();
     return null;
   }
 
-  return staffAccount;
+  return access.account;
 }
 
-async function redirectToStaffLogin() {
+async function redirectToStaffLogin(reason = "") {
   const loginUrl = new URL("staff-login.html", window.location.href);
   if (isDashboardPage) {
     loginUrl.searchParams.set("next", "dashboard.html");
+  }
+  if (reason) {
+    loginUrl.searchParams.set("reason", reason);
   }
 
   window.location.href = loginUrl.toString();
@@ -816,6 +1133,28 @@ async function saveProductToSupabase(product) {
       price: product.price,
       is_active: true,
     })
+    .select("sku, name, description, price, unit")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+async function updateProductInSupabase(originalSku, product) {
+  const supabase = await getSupabaseClient();
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      sku: product.sku,
+      name: product.name,
+      description: product.description,
+      unit: product.unit,
+      price: product.price,
+    })
+    .eq("sku", originalSku)
     .select("sku, name, description, price, unit")
     .single();
 
@@ -1036,8 +1375,12 @@ function renderProductAdminList() {
             <p>${product.description}</p>
             <div class="product-admin-meta">
               <span>Unit: ${product.unit || "item"}</span>
+              <span>Till: ${product.barcodeValue || product.sku || "Not set"}</span>
               <span>Stock: ${inventoryItem?.onHand ?? 0}</span>
               <span>Threshold: ${inventoryItem?.threshold ?? 0}</span>
+            </div>
+            <div class="product-admin-actions">
+              <button type="button" class="button secondary" data-edit-product="${product.sku || ""}">Edit Product</button>
             </div>
           </div>
         </article>
@@ -1305,12 +1648,18 @@ function updateLabelPreview(formData) {
     return;
   }
 
+  const barcodeValue = normalizeBarcodeValue(formData.barcode, getProductBarcodeValueByName(formData.product));
   document.getElementById("preview-product").textContent = formData.product;
   document.getElementById("preview-batch").textContent = formData.batch;
   document.getElementById("preview-packed").textContent = formData.packed;
   document.getElementById("preview-useby").textContent = formData.useby;
   document.getElementById("preview-weight").textContent = formData.weight;
   document.getElementById("preview-price").textContent = formData.price;
+  renderBarcodePreview(barcodeValue);
+
+  if (labelBarcodeInput) {
+    labelBarcodeInput.value = barcodeValue;
+  }
 }
 
 function renderFeaturedProducts() {
@@ -1375,6 +1724,11 @@ document.addEventListener("click", (event) => {
   if (tabLink) {
     setActiveTab(tabLink.getAttribute("data-open-tab"));
   }
+
+  const editProductButton = event.target.closest("[data-edit-product]");
+  if (editProductButton) {
+    populateProductFormForEdit(editProductButton.getAttribute("data-edit-product"));
+  }
 });
 
 const stockForm = document.getElementById("stock-form");
@@ -1407,6 +1761,8 @@ if (productForm) {
     event.preventDefault();
 
     const selectedImage = productImageInput?.files?.[0];
+    const originalSku = editingProductSku;
+    const wasEditing = Boolean(editingProductSku);
 
     const payload = {
       sku: productSkuInput.value.trim().toUpperCase(),
@@ -1416,10 +1772,16 @@ if (productForm) {
       price: Number(productPriceInput.value),
       openingStock: Number(productStockInput.value),
       threshold: Number(productThresholdInput.value),
+      barcodeValue: normalizeBarcodeValue(productBarcodeInput.value, productSkuInput.value),
     };
 
     if (!payload.sku || !payload.name || Number.isNaN(payload.price) || payload.price < 0) {
       setProductFeedback("Enter a SKU, product name, and valid price.", "danger");
+      return;
+    }
+
+    if (!payload.barcodeValue) {
+      setProductFeedback("Enter a till code using letters, numbers, spaces, dots, or hyphens.", "danger");
       return;
     }
 
@@ -1433,7 +1795,10 @@ if (productForm) {
       return;
     }
 
-    const skuExists = products.some((product) => String(product.sku || "").toUpperCase() === payload.sku);
+    const skuExists = products.some((product) => {
+      const productSku = String(product.sku || "").toUpperCase();
+      return productSku === payload.sku && productSku !== originalSku;
+    });
     if (skuExists) {
       setProductFeedback("That SKU already exists. Use a different code.", "danger");
       return;
@@ -1444,78 +1809,159 @@ if (productForm) {
       return;
     }
 
-    setProductFeedback(liveProductsEnabled ? "Saving product to Supabase." : "Adding product to the local catalogue.", "muted");
+    setProductFeedback(
+      editingProductSku
+        ? liveProductsEnabled
+          ? "Saving product changes to Supabase."
+          : "Saving product changes locally."
+        : liveProductsEnabled
+          ? "Saving product to Supabase."
+          : "Adding product to the local catalogue.",
+      "muted",
+    );
 
     try {
       const imageDataUrl = selectedImage ? await readFileAsDataUrl(selectedImage) : "";
-      const sourceProduct = liveProductsEnabled
-        ? await saveProductToSupabase(payload)
-        : {
-            sku: payload.sku,
-            name: payload.name,
-            description: payload.description,
-            unit: payload.unit,
-            price: payload.price,
-          };
-
-      const newProduct = createProductRecord({ ...sourceProduct, imageDataUrl });
-      products = [...products, newProduct];
-      inventory.push({
+      const existingProduct = originalSku
+        ? products.find((product) => String(product.sku || "").toUpperCase() === originalSku)
+        : null;
+      const existingInventoryItem = originalSku
+        ? inventory.find((item) => String(item.sku || "").toUpperCase() === originalSku)
+        : null;
+      const nextImageDataUrl = imageDataUrl || existingProduct?.imageDataUrl || "";
+      const storedProductRecord = {
         sku: payload.sku,
-        product: payload.name,
-        onHand: payload.openingStock,
+        name: payload.name,
+        description: payload.description,
+        unit: payload.unit,
+        price: payload.price,
+        openingStock: payload.openingStock,
         threshold: payload.threshold,
-      });
+        barcodeValue: payload.barcodeValue,
+      };
 
-      if (imageDataUrl) {
-        upsertStoredProductImage(payload.sku, imageDataUrl);
-      }
+      const sourceProduct = wasEditing
+        ? liveProductsEnabled
+          ? await updateProductInSupabase(originalSku, payload)
+          : {
+              ...existingProduct,
+              sku: payload.sku,
+              name: payload.name,
+              description: payload.description,
+              unit: payload.unit,
+              price: payload.price,
+              barcodeValue: payload.barcodeValue,
+            }
+        : liveProductsEnabled
+          ? await saveProductToSupabase(payload)
+          : {
+              sku: payload.sku,
+              name: payload.name,
+              description: payload.description,
+              unit: payload.unit,
+              price: payload.price,
+              barcodeValue: payload.barcodeValue,
+            };
 
-      if (!liveProductsEnabled) {
-        persistCustomProduct({
+      if (wasEditing) {
+        const updatedProduct = createProductRecord(
+          {
+            ...existingProduct,
+            ...sourceProduct,
+            imageDataUrl: nextImageDataUrl,
+          },
+          products.findIndex((product) => String(product.sku || "").toUpperCase() === originalSku),
+        );
+
+        products = products.map((product) =>
+          String(product.sku || "").toUpperCase() === originalSku ? updatedProduct : product,
+        );
+
+        inventory.forEach((item) => {
+          if (String(item.sku || "").toUpperCase() !== originalSku) {
+            return;
+          }
+
+          item.sku = payload.sku;
+          item.product = payload.name;
+          item.onHand = payload.openingStock;
+          item.threshold = payload.threshold;
+        });
+
+        if (existingInventoryItem && !inventory.some((item) => String(item.sku || "").toUpperCase() === payload.sku)) {
+          existingInventoryItem.sku = payload.sku;
+          existingInventoryItem.product = payload.name;
+          existingInventoryItem.onHand = payload.openingStock;
+          existingInventoryItem.threshold = payload.threshold;
+        }
+
+        if (originalSku && originalSku !== payload.sku) {
+          moveStoredProductImage(originalSku, payload.sku);
+        }
+
+        if (imageDataUrl) {
+          upsertStoredProductImage(payload.sku, imageDataUrl);
+        }
+
+        updateStoredCustomProduct(originalSku, storedProductRecord);
+
+        stockActivity.unshift({
+          time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          message: `${payload.name}: product details updated.`,
+        });
+      } else {
+        const newProduct = createProductRecord({ ...sourceProduct, imageDataUrl: nextImageDataUrl });
+        products = [...products, newProduct];
+        inventory.push({
           sku: payload.sku,
-          name: payload.name,
-          description: payload.description,
-          unit: payload.unit,
-          price: payload.price,
-          openingStock: payload.openingStock,
+          product: payload.name,
+          onHand: payload.openingStock,
           threshold: payload.threshold,
         });
-      }
 
-      stockActivity.unshift({
-        time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
-        message: `${payload.name}: new product added with ${payload.openingStock} units on hand.`,
-      });
+        if (imageDataUrl) {
+          upsertStoredProductImage(payload.sku, imageDataUrl);
+        }
+
+        updateStoredCustomProduct(payload.sku, storedProductRecord);
+
+        stockActivity.unshift({
+          time: new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+          message: `${payload.name}: new product added with ${payload.openingStock} units on hand.`,
+        });
+      }
 
       renderStorefront();
 
       if (labelForm) {
         document.getElementById("label-product").value = payload.name;
+        if (labelBarcodeInput) {
+          labelBarcodeInput.value = payload.barcodeValue;
+        }
       }
 
-      productForm.reset();
-      productSkuInput.value = "";
-      productNameInput.value = "";
-      productDescriptionInput.value = "";
-      productUnitInput.value = "item";
-      productPriceInput.value = "";
-      productStockInput.value = "0";
-      productThresholdInput.value = "0";
-      if (productImageInput) {
-        productImageInput.value = "";
-      }
-      previewProductImage("");
+      resetProductForm();
 
       setProductFeedback(
-        liveProductsEnabled
-          ? `${payload.name} was added and saved to the live product catalogue.`
-          : `${payload.name} was added locally and will stay available in this browser.`,
+        wasEditing
+          ? liveProductsEnabled
+            ? `${payload.name} was updated in the live product catalogue.`
+            : `${payload.name} was updated in this browser.`
+          : liveProductsEnabled
+            ? `${payload.name} was added and saved to the live product catalogue.`
+            : `${payload.name} was added locally and will stay available in this browser.`,
         "success",
       );
     } catch (error) {
-      setProductFeedback(error.message || "Unable to add the product.", "danger");
+      setProductFeedback(error.message || `Unable to ${wasEditing ? "update" : "add"} the product.`, "danger");
     }
+  });
+}
+
+if (productCancelButton) {
+  productCancelButton.addEventListener("click", () => {
+    resetProductForm();
+    setProductFeedback("Edit cancelled.", "muted");
   });
 }
 
@@ -1583,6 +2029,7 @@ if (labelForm) {
       useby: document.getElementById("label-useby").value,
       weight: document.getElementById("label-weight").value.trim(),
       price: document.getElementById("label-price").value.trim(),
+      barcode: document.getElementById("label-barcode").value.trim(),
     });
   });
 }
@@ -1611,12 +2058,14 @@ if (staffAuthForm) {
         throw error;
       }
 
-      const staffAccount = await ensureStaffSession(supabase);
-      if (!staffAccount) {
-        setAuthFeedback("This account is not an active staff user in the operations database.", "danger");
+      const access = await getCurrentStaffAccount(supabase);
+      if (access.status !== "ok") {
+        await supabase.auth.signOut();
+        setAuthFeedback(buildStaffAccessMessage(access.status, access.email), "danger");
         return;
       }
 
+      const staffAccount = access.account;
       setAuthFeedback(`Signed in as ${staffAccount.email}. Redirecting to the dashboard.`, "success");
       window.location.href = new URLSearchParams(window.location.search).get("next") || "dashboard.html";
     } catch (error) {
@@ -1639,6 +2088,17 @@ if (signOutButton) {
 async function bootstrapPage() {
   mergeStoredProducts();
   renderStorefront();
+  if (labelForm) {
+    updateLabelPreview({
+      product: document.getElementById("label-product").value.trim(),
+      batch: document.getElementById("label-batch").value.trim(),
+      packed: document.getElementById("label-packed").value,
+      useby: document.getElementById("label-useby").value,
+      weight: document.getElementById("label-weight").value.trim(),
+      price: document.getElementById("label-price").value.trim(),
+      barcode: document.getElementById("label-barcode").value.trim(),
+    });
+  }
   showLiveDataState(false);
 
   try {
@@ -1651,13 +2111,29 @@ async function bootstrapPage() {
   }
 
   if (isStaffLoginPage) {
+    const loginReason = new URLSearchParams(window.location.search).get("reason");
+    if (loginReason === "not-staff") {
+      setAuthFeedback("You are signed in, but this account is not provisioned for staff access. Ask an admin to promote the user and assign staff permissions.", "danger");
+    } else if (loginReason === "inactive") {
+      setAuthFeedback("This staff account is inactive. Ask an admin to reactivate it before signing in.", "danger");
+    } else if (loginReason === "no-profile") {
+      setAuthFeedback("This authenticated account is missing its app profile row. Ask an admin to complete Supabase provisioning.", "danger");
+    } else if (loginReason === "missing-staff-profile") {
+      setAuthFeedback("This account has a staff role but no staff permissions profile. Ask an admin to finish staff provisioning.", "danger");
+    }
+
     try {
       const supabase = await getSupabaseClient();
-      const staffAccount = await ensureStaffSession(supabase);
-      if (staffAccount) {
+      const access = await getCurrentStaffAccount(supabase);
+      if (access.status === "ok") {
+        const staffAccount = access.account;
         setAuthFeedback(`Already signed in as ${staffAccount.email}. Redirecting to the dashboard.`, "success");
         window.location.href = new URLSearchParams(window.location.search).get("next") || "dashboard.html";
         return;
+      }
+      if (access.status !== "no-user") {
+        await supabase.auth.signOut();
+        setAuthFeedback(buildStaffAccessMessage(access.status, access.email), "danger");
       }
     } catch (error) {
       console.error("Staff session check failed:", error);
@@ -1671,15 +2147,20 @@ async function bootstrapPage() {
 
   try {
     const supabase = await getSupabaseClient();
-    const staffAccount = await ensureStaffSession(supabase);
-    if (!staffAccount) {
-      await redirectToStaffLogin();
+    const access = await getCurrentStaffAccount(supabase);
+    if (access.status !== "ok") {
+      if (access.status !== "no-user") {
+        setDashboardAuthStatus(buildStaffAccessMessage(access.status, access.email), "danger");
+        await supabase.auth.signOut();
+      }
+      await redirectToStaffLogin(access.status);
       return;
     }
+    const staffAccount = access.account;
 
     operationsSection.hidden = false;
     setDashboardAuthStatus(
-      `Signed in as ${staffAccount.staff_profiles?.first_name || staffAccount.email}. Live operations data is enabled.`,
+      `Signed in as ${staffAccount.staff_profiles?.first_name || staffAccount.email}. Live operations data is enabled for ${staffAccount.role}.`,
       "success",
     );
 

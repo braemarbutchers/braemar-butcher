@@ -106,7 +106,7 @@
               <section class="panel action-panel">
                 <div class="panel-head">
                   <p class="eyebrow">Catalogue</p>
-                  <h4>Add a new product</h4>
+                  <h4 id="product-form-title">Add a new product</h4>
                 </div>
                 <form id="product-form">
                   <label>
@@ -148,13 +148,18 @@
                     <input id="product-threshold" type="number" min="0" step="1" value="6" required />
                   </label>
                   <label>
+                    Till code
+                    <input id="product-barcode" type="text" value="DB-BUR-07" />
+                  </label>
+                  <label>
                     Product image
                     <input id="product-image" type="file" accept="image/*" />
                   </label>
                   <div class="product-image-preview" id="product-image-preview" hidden>
                     <img id="product-image-preview-img" alt="Product image preview" />
                   </div>
-                  <button type="submit" class="button primary full-width">Add Product</button>
+                  <button id="product-submit-button" type="submit" class="button primary full-width">Add Product</button>
+                  <button id="product-cancel-button" type="button" class="button secondary full-width" hidden>Cancel Edit</button>
                   <p class="auth-feedback" id="product-form-feedback">Adds the line to the current catalogue and stock list.</p>
                 </form>
               </section>
@@ -265,6 +270,10 @@
                     Price
                     <input id="label-price" type="text" value="£12.50" />
                   </label>
+                  <label>
+                    Till code
+                    <input id="label-barcode" type="text" value="DB-PIE-01" />
+                  </label>
                   <button type="submit" class="button primary full-width">Update Preview</button>
                   <button id="print-label" type="button" class="button secondary full-width">Print Label</button>
                 </form>
@@ -300,7 +309,10 @@
                   </dl>
                   <div class="label-price-row">
                     <span id="preview-price">£12.50</span>
-                    <span class="barcode">|||| ||| |||| | ||</span>
+                    <div class="barcode-block">
+                      <div class="barcode-svg" id="preview-barcode-svg" aria-hidden="true"></div>
+                      <span class="barcode-value" id="preview-barcode-value">DB-PIE-01</span>
+                    </div>
                   </div>
                 </article>
               </section>

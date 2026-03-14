@@ -59,17 +59,22 @@ The [api/config.js](/Users/marksmith/braemar-butcher/api/config.js) endpoint exp
 ### Supabase
 
 1. Create a Supabase project or run `supabase start` locally
-2. Apply [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql)
-3. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
+2. If you have an older or half-applied schema, run [supabase/reset_app_schema.sql](/Users/marksmith/braemar-butcher/supabase/reset_app_schema.sql)
+3. Apply [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql)
+4. Apply [supabase/migrations/202603130002_staff_access_policies.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130002_staff_access_policies.sql)
+5. Load [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql) for demo data
 
 The migration uses `auth.users` for sign-in and creates app-level profile tables plus row-level security in `public`.
 The seed creates sample auth users for `admin@braemarbutcher.co.uk`, `counter@braemarbutcher.co.uk`, `production@braemarbutcher.co.uk`, `alice.macleod@example.com`, and `thefifearms@example.com`.
+Any normal signup becomes a `client` automatically. To let someone add products or manage orders, an existing admin must promote that user to `staff` or `admin` with `public.promote_user_role(...)`, then grant permissions if needed with `public.set_staff_permissions(...)`.
 
 ## Supabase foundation
 
 The backend is now structured for Supabase:
 
 - [supabase/migrations/202603130001_initial_schema.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130001_initial_schema.sql): schema, triggers, helper functions, and row-level security policies
+- [supabase/migrations/202603130002_staff_access_policies.sql](/Users/marksmith/braemar-butcher/supabase/migrations/202603130002_staff_access_policies.sql): admin-only functions to promote users into staff or admin roles and assign permissions
+- [supabase/reset_app_schema.sql](/Users/marksmith/braemar-butcher/supabase/reset_app_schema.sql): cleanup script for older or partially applied app schema
 - [supabase/seed.sql](/Users/marksmith/braemar-butcher/supabase/seed.sql): seeded auth users, profiles, products, orders, saved lists, invoices, and payments
 - [supabase/config.toml](/Users/marksmith/braemar-butcher/supabase/config.toml): local Supabase CLI configuration
 
