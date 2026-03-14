@@ -464,6 +464,19 @@
                     Batch, intake, SKU, or till code
                     <input id="scan-code" type="text" value="DB-260313-PIE" required />
                   </label>
+                  <div class="scan-camera">
+                    <div class="scan-camera-head">
+                      <strong>Camera scanner</strong>
+                      <div class="scan-camera-actions">
+                        <button id="scan-camera-start" type="button" class="button secondary">Start Camera</button>
+                        <button id="scan-camera-stop" type="button" class="button secondary" disabled>Stop Camera</button>
+                      </div>
+                    </div>
+                    <video id="scan-camera-video" playsinline muted hidden></video>
+                    <p class="scan-camera-note" id="scan-camera-note">
+                      Use the rear camera on a phone or tablet to scan a barcode straight into the lookup.
+                    </p>
+                  </div>
                   <label>
                     Quick pick
                     <select id="scan-select"></select>

@@ -340,6 +340,10 @@ let deliveryOrders = [
   },
 ];
 let supabaseClientPromise;
+let scanCameraStream = null;
+let scanDetector = null;
+let scanLoopHandle = 0;
+let lastScannedCode = "";
 
 const basket = new Map();
 const stockActivity = [
@@ -368,6 +372,10 @@ const scanTitle = document.getElementById("scan-title");
 const scanMeta = document.getElementById("scan-meta");
 const scanTimeline = document.getElementById("scan-timeline");
 const scanFeedback = document.getElementById("scan-feedback");
+const scanCameraStartButton = document.getElementById("scan-camera-start");
+const scanCameraStopButton = document.getElementById("scan-camera-stop");
+const scanCameraVideo = document.getElementById("scan-camera-video");
+const scanCameraNote = document.getElementById("scan-camera-note");
 const deliveryDateInput = document.getElementById("delivery-date");
 const deliverySummary = document.getElementById("delivery-summary");
 const deliveryList = document.getElementById("delivery-list");
@@ -1019,6 +1027,118 @@ function setScanFeedback(message, tone = "muted") {
 
   scanFeedback.textContent = message;
   scanFeedback.dataset.tone = tone;
+}
+
+function updateScanCameraState({ active, note }) {
+  if (scanCameraStartButton) {
+    scanCameraStartButton.disabled = active;
+  }
+  if (scanCameraStopButton) {
+    scanCameraStopButton.disabled = !active;
+  }
+  if (scanCameraVideo) {
+    scanCameraVideo.hidden = !active;
+  }
+  if (scanCameraNote && note) {
+    scanCameraNote.textContent = note;
+  }
+}
+
+function stopScanCamera() {
+  if (scanLoopHandle) {
+    window.cancelAnimationFrame(scanLoopHandle);
+    scanLoopHandle = 0;
+  }
+
+  if (scanCameraStream) {
+    scanCameraStream.getTracks().forEach((track) => track.stop());
+    scanCameraStream = null;
+  }
+
+  if (scanCameraVideo) {
+    scanCameraVideo.pause();
+    scanCameraVideo.srcObject = null;
+    scanCameraVideo.hidden = true;
+  }
+
+  updateScanCameraState({
+    active: false,
+    note: "Use the rear camera on a phone or tablet to scan a barcode straight into the lookup.",
+  });
+}
+
+async function runScanDetectionLoop() {
+  if (!scanDetector || !scanCameraVideo || scanCameraVideo.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) {
+    scanLoopHandle = window.requestAnimationFrame(runScanDetectionLoop);
+    return;
+  }
+
+  try {
+    const barcodes = await scanDetector.detect(scanCameraVideo);
+    const firstMatch = Array.isArray(barcodes) ? barcodes.find((entry) => entry.rawValue) : null;
+    const scannedCode = String(firstMatch?.rawValue || "").trim().toUpperCase();
+
+    if (scannedCode && scannedCode !== lastScannedCode) {
+      lastScannedCode = scannedCode;
+      if (scanCodeInput) {
+        scanCodeInput.value = scannedCode;
+      }
+      renderScanResultByCode(scannedCode);
+      updateScanCameraState({
+        active: true,
+        note: `Camera detected ${scannedCode}. Scan another code or stop the camera.`,
+      });
+    }
+  } catch (error) {
+    updateScanCameraState({
+      active: true,
+      note: error.message || "Camera is running, but barcode detection is unavailable right now.",
+    });
+  }
+
+  scanLoopHandle = window.requestAnimationFrame(runScanDetectionLoop);
+}
+
+async function startScanCamera() {
+  if (!scanCameraVideo || !navigator.mediaDevices?.getUserMedia) {
+    setScanFeedback("This browser does not support camera scanning.", "danger");
+    return;
+  }
+
+  if (typeof window.BarcodeDetector !== "function") {
+    setScanFeedback("Live barcode scanning needs a browser with BarcodeDetector support. Manual entry still works.", "danger");
+    return;
+  }
+
+  try {
+    const supportedFormats = typeof window.BarcodeDetector.getSupportedFormats === "function"
+      ? await window.BarcodeDetector.getSupportedFormats()
+      : [];
+    const preferredFormats = ["code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e"];
+    const detectorFormats = supportedFormats.length
+      ? preferredFormats.filter((format) => supportedFormats.includes(format))
+      : preferredFormats;
+
+    scanDetector = new window.BarcodeDetector({ formats: detectorFormats.length ? detectorFormats : undefined });
+    scanCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: "environment" },
+      },
+      audio: false,
+    });
+
+    scanCameraVideo.srcObject = scanCameraStream;
+    await scanCameraVideo.play();
+    lastScannedCode = "";
+    updateScanCameraState({
+      active: true,
+      note: "Camera active. Hold the barcode inside the frame to populate the lookup.",
+    });
+    runScanDetectionLoop();
+  } catch (error) {
+    stopScanCamera();
+    setScanFeedback(error.message || "Unable to start the camera scanner.", "danger");
+  }
 }
 
 function formatDeliveryWindow(value) {
@@ -1813,6 +1933,10 @@ async function fetchLiveDeliveries() {
 }
 
 function setActiveTab(tabName) {
+  if (tabName !== "scan") {
+    stopScanCamera();
+  }
+
   document.querySelectorAll(".tab").forEach((button) => {
     const active = button.dataset.tab === tabName;
     button.classList.toggle("active", active);
@@ -2766,6 +2890,18 @@ if (scanForm) {
   });
 }
 
+if (scanCameraStartButton) {
+  scanCameraStartButton.addEventListener("click", async () => {
+    await startScanCamera();
+  });
+}
+
+if (scanCameraStopButton) {
+  scanCameraStopButton.addEventListener("click", () => {
+    stopScanCamera();
+  });
+}
+
 if (finishedBatchForm) {
   finishedBatchForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -3137,6 +3273,10 @@ if (printDeliverySheetButton) {
 window.addEventListener("afterprint", () => {
   document.body.classList.remove("printing-driver-sheet");
   document.body.classList.remove("printing-label-sheet");
+});
+
+window.addEventListener("beforeunload", () => {
+  stopScanCamera();
 });
 
 const labelForm = document.getElementById("label-form");
